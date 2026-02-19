@@ -26,17 +26,7 @@ export async function deleteTorrents(hashes) {
   );
 }
 
-/**
- * Extract base movie title (remove resolution, codec etc)
- */
-// function extractMovieKey(name) {
-//   return name
-//     .replace(/\b(2160p|1080p|720p|480p)\b/gi, "")
-//     .replace(/\b(x265|x264|HEVC|HDRip|WEB-DL|AAC|DD5\.1).*$/i, "")
-//     .replace(/\s+/g, " ")
-//     .trim()
-//     .toLowerCase();
-// }
+
 
 
 function extractMovieKey(name) {
@@ -83,7 +73,7 @@ export async function cleanupTodayTorrents() {
 
   if (!torrents.length) {
     console.log("No torrents found for today.");
-    // await sendMessage("No torrents found for today.")
+    await sendMessage("No torrents found for today.")
     return;
   }
 
@@ -108,8 +98,8 @@ export async function cleanupTodayTorrents() {
     const best = selectBestTorrent(group);
 
     console.log(`Keeping for "${movie}":`, best.name);
-  //  await sendMessage('keeping');
-  //  await sendMessage(best.name);
+   await sendMessage('keeping');
+   await sendMessage(best.name);
     group
       .filter(t => t.hash !== best.hash)
       .forEach(t => hashesToDelete.push(t.hash));
@@ -120,12 +110,12 @@ export async function cleanupTodayTorrents() {
     //uncommending the movie 
 
 
-    // await deleteTorrents(hashesToDelete);
+    await deleteTorrents(hashesToDelete);
     
     console.log("Duplicate torrents deleted.");
-    // await sendMessage('Duplicate torrents deleted.');
+    await sendMessage('Duplicate torrents deleted.');
   } else {
     console.log("No duplicates found.");
-    // await sendMessage('No duplicates found.');
+    await sendMessage('No duplicates found.');
   }
 }
