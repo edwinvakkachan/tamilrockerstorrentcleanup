@@ -83,7 +83,7 @@ export async function cleanupTodayTorrents() {
 
   if (!torrents.length) {
     console.log("No torrents found for today.");
-    await sendMessage("No torrents found for today.")
+    // await sendMessage("No torrents found for today.")
     return;
   }
 
@@ -108,8 +108,8 @@ export async function cleanupTodayTorrents() {
     const best = selectBestTorrent(group);
 
     console.log(`Keeping for "${movie}":`, best.name);
-   await sendMessage('keeping');
-   await sendMessage(best.name);
+  //  await sendMessage('keeping');
+  //  await sendMessage(best.name);
     group
       .filter(t => t.hash !== best.hash)
       .forEach(t => hashesToDelete.push(t.hash));
@@ -118,9 +118,9 @@ export async function cleanupTodayTorrents() {
   if (hashesToDelete.length) {
     await deleteTorrents(hashesToDelete);
     console.log("Duplicate torrents deleted.");
-    await sendMessage('Duplicate torrents deleted.');
+    // await sendMessage('Duplicate torrents deleted.');
   } else {
     console.log("No duplicates found.");
-    await sendMessage('No duplicates found.');
+    // await sendMessage('No duplicates found.');
   }
 }
