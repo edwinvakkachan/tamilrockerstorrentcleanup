@@ -6,16 +6,28 @@ dotenv.config();
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
+if (!TOKEN || !CHAT_ID) {
+  throw new Error("Telegram environment variables missing");
+}
 
+const telegram = axios.create({
+  baseURL: `https://api.telegram.org/bot${TOKEN}`,
+  timeout: 10000, // 10 seconds
+});
 
-
-// Send message
 export async function sendMessage(text) {
-  await axios.post(
-    `https://api.telegram.org/bot${TOKEN}/sendMessage`,
-    {
+  try {
+    const response = await telegram.post("/sendMessage", {
       chat_id: CHAT_ID,
-      text
-    }
-  );
+      text,
+    });
+
+    return response.data;
+
+  } catch (error) {
+    console.error("Telegram send failed:", error.message);
+
+    // Do NOT rethrow if you don't want app to crash
+    return null;
+  }
 }
