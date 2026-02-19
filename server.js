@@ -6,6 +6,7 @@ import { cleanupTodayTorrents } from "./qbittorrent/torrentCleanUp.js";
 
 async function main() {
   try {
+    await sendMessage('torrent cleaning process started');
     console.log("torrent adding from db has been started");
 
     await addToTorrent();
