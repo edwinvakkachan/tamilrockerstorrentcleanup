@@ -11,6 +11,7 @@ async function main() {
     await addToTorrent();
     await delay(5000);
     await cleanupTodayTorrents();
+    //go and uncommend
     console.log("torrent adding from db has been  completed successfully");
     await sendMessage("torrent adding from db has been  completed successfully")
   } catch (error) {

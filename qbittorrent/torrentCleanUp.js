@@ -116,7 +116,12 @@ export async function cleanupTodayTorrents() {
   }
 
   if (hashesToDelete.length) {
-    await deleteTorrents(hashesToDelete);
+
+    //uncommending the movie 
+
+
+    // await deleteTorrents(hashesToDelete);
+    
     console.log("Duplicate torrents deleted.");
     // await sendMessage('Duplicate torrents deleted.');
   } else {
