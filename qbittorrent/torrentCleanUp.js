@@ -1,6 +1,6 @@
 import { qb } from "./qb.js";
 import { sendMessage } from "../telegram/sendTelegramMessage.js";
-
+import { delay } from "../delay.js";
 const TWO_GB = 2 * 1024 * 1024 * 1024;
 
 function getTodayTag() {
@@ -69,11 +69,15 @@ function selectBestTorrent(torrents) {
 
 export async function cleanupTodayTorrents() {
   const tag = getTodayTag();
+  await sendMessage(`today is ${tag}`)
+  await delay(1000,true)
+  console.log(`today is ${tag}`)
   const torrents = await getTorrentsByTag(tag);
 
   if (!torrents.length) {
     console.log("No torrents found for today.");
     await sendMessage("No torrents found for today.")
+    await delay(1000,true)
     return;
   }
 
@@ -114,8 +118,10 @@ export async function cleanupTodayTorrents() {
     
     console.log("Duplicate torrents deleted.");
     await sendMessage('Duplicate torrents deleted.');
+    await delay(1000,true)
   } else {
     console.log("No duplicates found.");
     await sendMessage('No duplicates found.');
+    await delay(1000,true)
   }
 }
