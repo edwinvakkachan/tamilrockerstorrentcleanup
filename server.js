@@ -2,7 +2,7 @@
 // import { addToTorrent } from "./addTOTorrent.js";
 import { delay } from "./delay.js";
 import { sendMessage } from "./telegram/sendTelegramMessage.js";
-import { cleanupTodayTorrents } from "./qbittorrent/torrentCleanUp.js";
+import { cleanupTodayTorrents,moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
 import { loginQB } from "./qbittorrent/qb.js";
 
 
@@ -17,7 +17,10 @@ async function main() {
     await delay(2000,true)
 
     await cleanupTodayTorrents();
- 
+    await delay(2000,true)
+
+    await moveTodayShowsToTV();
+
     console.log("torrent cleaning process completed successfully 🎉");
     await sendMessage("torrent cleaning process completed successfully 🎉")
     await sendMessage("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
