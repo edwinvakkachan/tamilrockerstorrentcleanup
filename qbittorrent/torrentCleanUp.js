@@ -104,8 +104,6 @@ export async function cleanupTodayTorrents() {
     const best = selectBestTorrent(group);
 
     console.log(`Keeping for "${movie}":`, best.name);
-   await sendMessage('keeping');
-   await sendMessage(best.name);
     group
       .filter(t => t.hash !== best.hash)
       .forEach(t => hashesToDelete.push(t.hash));
@@ -122,7 +120,7 @@ export async function cleanupTodayTorrents() {
     await sendMessage('⚠️ Duplicate torrents deleted.');
 
   } else {
-    console.log("❕ No duplicates found.");
-    await sendMessage('❕ No duplicates found.');
+    console.log("⚠️ No duplicates found.");
+    await sendMessage('⚠️ No duplicates found.');
   }
 }

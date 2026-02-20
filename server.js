@@ -6,8 +6,8 @@ import { cleanupTodayTorrents } from "./qbittorrent/torrentCleanUp.js";
 
 async function main() {
   try {
-    await sendMessage("🍇🍇🍇🍇🍇🍇🍇🍇🍇")
-    console.log("🍇🍇🍇🍇🍇🍇🍇🍇🍇")
+    await sendMessage("------------------------")
+    console.log("------------------------")
     console.log("🚀 torrent cleaning process started");
     await sendMessage('🚀 torrent cleaning process started');
 
@@ -15,8 +15,8 @@ async function main() {
  
     console.log("torrent cleaning process completed successfully 🎉");
     await sendMessage("torrent cleaning process completed successfully 🎉")
-    await sendMessage("🍇🍇🍇🍇🍇🍇🍇🍇🍇")
-    console.log("🍇🍇🍇🍇🍇🍇🍇🍇🍇")
+    await sendMessage("------------------------")
+    console.log("------------------------")
   } catch (error) {
     console.error("Fatal error in main():");
     console.error(error);
