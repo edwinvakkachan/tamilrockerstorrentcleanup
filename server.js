@@ -6,15 +6,17 @@ import { cleanupTodayTorrents } from "./qbittorrent/torrentCleanUp.js";
 
 async function main() {
   try {
-    await sendMessage('torrent cleaning process started');
-    console.log("torrent adding from db has been started");
+    await sendMessage("🍇🍇🍇🍇🍇🍇🍇🍇🍇")
+    console.log("🍇🍇🍇🍇🍇🍇🍇🍇🍇")
+    console.log("🚀 torrent cleaning process started");
+    await sendMessage('🚀 torrent cleaning process started');
 
-    await addToTorrent();
-    await delay(5000);
     await cleanupTodayTorrents();
-    //go and uncommend
-    console.log("torrent adding from db has been  completed successfully");
-    await sendMessage("torrent adding from db has been  completed successfully")
+ 
+    console.log("torrent cleaning process completed successfully 🎉");
+    await sendMessage("torrent cleaning process completed successfully 🎉")
+    await sendMessage("🍇🍇🍇🍇🍇🍇🍇🍇🍇")
+    console.log("🍇🍇🍇🍇🍇🍇🍇🍇🍇")
   } catch (error) {
     console.error("Fatal error in main():");
     console.error(error);

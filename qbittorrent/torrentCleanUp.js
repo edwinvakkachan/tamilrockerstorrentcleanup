@@ -69,15 +69,13 @@ function selectBestTorrent(torrents) {
 
 export async function cleanupTodayTorrents() {
   const tag = getTodayTag();
-  await sendMessage(`today is ${tag}`)
-  await delay(1000,true)
-  console.log(`today is ${tag}`)
+  await sendMessage(`📅 today date  is ${tag}`)
+  console.log(`📅 today is ${tag}`)
   const torrents = await getTorrentsByTag(tag);
 
   if (!torrents.length) {
-    console.log("No torrents found for today.");
-    await sendMessage("No torrents found for today.")
-    await delay(1000,true)
+    console.log("🚨 No torrents found for today.");
+    await sendMessage("🚨 No torrents found for today.")
     return;
   }
 
@@ -116,12 +114,11 @@ export async function cleanupTodayTorrents() {
 
     await deleteTorrents(hashesToDelete);
     
-    console.log("Duplicate torrents deleted.");
-    await sendMessage('Duplicate torrents deleted.');
-    await delay(1000,true)
+    console.log("⚠️ Duplicate torrents deleted.");
+    await sendMessage('⚠️ Duplicate torrents deleted.');
+
   } else {
-    console.log("No duplicates found.");
-    await sendMessage('No duplicates found.');
-    await delay(1000,true)
+    console.log("❕ No duplicates found.");
+    await sendMessage('❕ No duplicates found.');
   }
 }

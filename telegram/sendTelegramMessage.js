@@ -1,5 +1,6 @@
 import axios from "axios";
 import dotenv from "dotenv";
+import { delay } from "../delay.js";
 
 dotenv.config();
 
@@ -17,10 +18,13 @@ const telegram = axios.create({
 
 export async function sendMessage(text) {
   try {
+
     const response = await telegram.post("/sendMessage", {
       chat_id: CHAT_ID,
       text,
     });
+
+    await delay(2000,true)
 
     return response.data;
 
