@@ -7,6 +7,8 @@ function getTodayTag() {
   return new Date().toISOString().split("T")[0];
 }
 
+
+
 export async function getTorrentsByTag(tag) {
   const { data } = await qb.get("/api/v2/torrents/info", {
     params: { tag }

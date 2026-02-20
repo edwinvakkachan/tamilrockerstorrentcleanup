@@ -1,8 +1,10 @@
 
-import { addToTorrent } from "./addTOTorrent.js";
+// import { addToTorrent } from "./addTOTorrent.js";
 import { delay } from "./delay.js";
 import { sendMessage } from "./telegram/sendTelegramMessage.js";
 import { cleanupTodayTorrents } from "./qbittorrent/torrentCleanUp.js";
+import { loginQB } from "./qbittorrent/qb.js";
+
 
 async function main() {
   try {
@@ -10,6 +12,9 @@ async function main() {
     console.log("------------------------")
     console.log("🚀 torrent cleaning process started");
     await sendMessage('🚀 torrent cleaning process started');
+
+    await loginQB()
+    await delay(2000,true)
 
     await cleanupTodayTorrents();
  
