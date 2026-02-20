@@ -11,6 +11,7 @@ export async function getTorrentsByTag(tag) {
   const { data } = await qb.get("/api/v2/torrents/info", {
     params: { tag }
   });
+  await delay(3000,true)
   return data;
 }
 
