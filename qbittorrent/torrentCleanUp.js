@@ -71,7 +71,10 @@ export async function cleanupTodayTorrents() {
   const tag = getTodayTag();
   await sendMessage(`📅 today date  is ${tag}`)
   console.log(`📅 today is ${tag}`)
+
   const torrents = await getTorrentsByTag(tag);
+
+  await delay(2000,true);
 
   if (!torrents.length) {
     console.log("🚨 No torrents found for today.");
