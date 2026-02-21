@@ -23,6 +23,7 @@ async function main() {
 
     console.log("torrent cleaning process completed successfully 🎉");
     await sendMessage("torrent cleaning process completed successfully 🎉")
+   await delay(1000,true);
     await triggerHomeAssistantWebhook({
   status: "success",
   message: "Torrent cleaning completed",
