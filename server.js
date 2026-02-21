@@ -4,7 +4,7 @@ import { delay } from "./delay.js";
 import { sendMessage } from "./telegram/sendTelegramMessage.js";
 import { cleanupTodayTorrents,moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
 import { loginQB } from "./qbittorrent/qb.js";
-
+import { triggerHomeAssistantWebhook } from "./homeassitant/homeAssistantWebhook.js";
 
 async function main() {
   try {
@@ -23,6 +23,11 @@ async function main() {
 
     console.log("torrent cleaning process completed successfully 🎉");
     await sendMessage("torrent cleaning process completed successfully 🎉")
+    await triggerHomeAssistantWebhook({
+  status: "success",
+  message: "Torrent cleaning completed",
+  time: new Date().toISOString(),
+});
     await sendMessage("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
     console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
   } catch (error) {
