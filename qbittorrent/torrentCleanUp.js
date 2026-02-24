@@ -121,7 +121,8 @@ function selectBestTorrent(torrents) {
 }
 
 export async function cleanupTodayTorrents() {
-  const tag = getTodayTag();
+  // const tag = getTodayTag();
+  const tag = 'script';
   await sendMessage(`📅 today date  is ${tag}`)
   console.log(`📅 today is ${tag}`)
 
