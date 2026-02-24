@@ -1,4 +1,5 @@
 import axios from "axios";
+import { delay } from "../delay.js";
 
 const HA_WEBHOOK_URL = process.env.HA_WEBHOOK_URL; 
 // Example: http://192.168.0.50:8123/api/webhook/your_webhook_id
@@ -16,6 +17,7 @@ export async function triggerHomeAssistantWebhook(payload = {}) {
       },
       timeout: 5000,
     });
+await delay(5000,true)
 
     console.log("✅ Home Assistant webhook triggered:", response.status);
   } catch (error) {
