@@ -50,24 +50,74 @@ function extractMovieKey(name) {
 /**
  * Select best torrent from a group
  */
+// function selectBestTorrent(torrents) {
+//   // Prefer 1080p under 2GB
+//   const candidates = torrents.filter(t =>
+//     /1080p/i.test(t.name) && t.size < TWO_GB
+//   );
+
+//   if (candidates.length > 0) {
+//     return candidates.sort((a, b) => b.size - a.size)[0];
+//   }
+
+//   // fallback: best overall under 2GB
+//   const under2gb = torrents.filter(t => t.size < TWO_GB);
+//   if (under2gb.length > 0) {
+//     return under2gb.sort((a, b) => b.size - a.size)[0];
+//   }
+
+//   // final fallback: largest
+//   return torrents.sort((a, b) => b.size - a.size)[0];
+// }
+
 function selectBestTorrent(torrents) {
-  // Prefer 1080p under 2GB
+
+  const TWO_GB = 2 * 1024 * 1024 * 1024;
+
+  function detectLanguagePriority(name) {
+    const lower = name.toLowerCase();
+
+    const hasMalayalam = /\b(malayalam|mal)\b/i.test(lower);
+    const hasHindi = /\b(hindi|hin)\b/i.test(lower);
+    const hasTamil = /\b(tamil|tam)\b/i.test(lower);
+
+    if (hasMalayalam) return 3;
+    if (hasHindi) return 2;
+    if (hasTamil) return 1;
+
+    return 0;
+  }
+
+  function sortByLanguageAndSize(list) {
+    return [...list].sort((a, b) => {
+      const langDiff =
+        detectLanguagePriority(b.name) -
+        detectLanguagePriority(a.name);
+
+      if (langDiff !== 0) return langDiff;
+
+      return b.size - a.size;
+    });
+  }
+
+  // 1️⃣ Prefer 1080p under 2GB
   const candidates = torrents.filter(t =>
     /1080p/i.test(t.name) && t.size < TWO_GB
   );
 
   if (candidates.length > 0) {
-    return candidates.sort((a, b) => b.size - a.size)[0];
+    return sortByLanguageAndSize(candidates)[0];
   }
 
-  // fallback: best overall under 2GB
+  // 2️⃣ Fallback: any under 2GB
   const under2gb = torrents.filter(t => t.size < TWO_GB);
+
   if (under2gb.length > 0) {
-    return under2gb.sort((a, b) => b.size - a.size)[0];
+    return sortByLanguageAndSize(under2gb)[0];
   }
 
-  // final fallback: largest
-  return torrents.sort((a, b) => b.size - a.size)[0];
+  // 3️⃣ Final fallback: everything
+  return sortByLanguageAndSize(torrents)[0];
 }
 
 export async function cleanupTodayTorrents() {
