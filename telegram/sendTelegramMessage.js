@@ -24,7 +24,7 @@ export async function sendMessage(text) {
       text,
     });
 
-    await delay(2000,true)
+    await delay(10000,true)
 
     return response.data;
 
