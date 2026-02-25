@@ -4,7 +4,7 @@ import { delay } from "./delay.js";
 import { sendMessage } from "./telegram/sendTelegramMessage.js";
 import { cleanupTodayTorrents,moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
 import { loginQB } from "./qbittorrent/qb.js";
-import { triggerHomeAssistantWebhook } from "./homeassitant/homeAssistantWebhook.js";
+import { triggerHomeAssistantWebhook ,triggerHAWebhookWhenErrorOccurs } from "./homeassitant/homeAssistantWebhook.js";
 import { log } from "./timelog.js";
 
 async function main() {
@@ -39,6 +39,7 @@ async function main() {
     console.error("Fatal error in main():");
     console.error(error);
     await sendMessage("❌ Fatal error in main():")
+    await triggerHAWebhookWhenErrorOccurs()
   }
 }
 

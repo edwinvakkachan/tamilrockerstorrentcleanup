@@ -30,7 +30,7 @@ await delay(5000,true)
 }
 
 
-export async function triggerHAWebhookWhenErrorOccurs(errorMessage) {
+export async function triggerHAWebhookWhenErrorOccurs(errorMessage="") {
   try {
     await axios.post(
       `${config.HA_WEBHOOKError_URL}`,
@@ -47,7 +47,7 @@ export async function triggerHAWebhookWhenErrorOccurs(errorMessage) {
       }
     );
 
-    console.log("🏠 Home Assistant webhook triggered");
+    console.log("🏠 Home Assistant webhook triggered for running again");
     // await sendTelegramMessage("🏠 Home Assistant webhook triggered")
   } catch (err) {
     console.error("⚠️ Failed to trigger HA webhook ERROR url:", err.message);
