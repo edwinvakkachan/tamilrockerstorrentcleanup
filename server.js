@@ -9,10 +9,9 @@ import { log } from "./timelog.js";
 
 async function main() {
   try {
-    await sendMessage("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
+    
     console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
     console.log("🚀 torrent cleaning process started");
-    await sendMessage('🚀 torrent cleaning process started');
     await log();
 
     await loginQB()
@@ -32,8 +31,6 @@ async function main() {
   time: new Date().toISOString(),
 });
 
-    await log();
-    await sendMessage("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
     console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
   } catch (error) {
     console.error("Fatal error in main():");
