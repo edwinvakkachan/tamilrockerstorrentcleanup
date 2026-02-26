@@ -17,11 +17,12 @@ export async function triggerHomeAssistantWebhook(payload = {}) {
       headers: {
         "Content-Type": "application/json",
       },
-      timeout: 5000,
+      timeout: 15000,
     });
-await delay(5000,true)
+await delay(10000,true)
 
-    console.log("✅ Home Assistant webhook triggered:", response.status);
+console.log("✅ Home Assistant webhook triggered:", response.status);
+return ;
   } catch (error) {
     console.error("❌ Failed to trigger Home Assistant webhook");
     await sendMessage("❌ Failed to trigger Home Assistant webhook for files to traktv db add");
@@ -43,12 +44,14 @@ export async function triggerHAWebhookWhenErrorOccurs(errorMessage="") {
         headers: {
           "Content-Type": "application/json"
         },
-        timeout: 5000
+        timeout: 10000
       }
     );
 
     console.log("🏠 Home Assistant webhook triggered for running again");
     // await sendTelegramMessage("🏠 Home Assistant webhook triggered")
+    await delay(10000,true);
+    return;
   } catch (err) {
     console.error("⚠️ Failed to trigger HA webhook ERROR url:", err.message);
     await sendTelegramMessage("⚠️ Failed to trigger HA webhook ERROR url")
