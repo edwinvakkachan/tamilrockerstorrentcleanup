@@ -13,6 +13,7 @@ services:
       QBITUSER: ${QBITUSER}
       QBITPASS: ${QBITPASS}
       HA_WEBHOOK_URL: ${HA_WEBHOOK_URL} 
+      HA_WEBHOOKError_URL: ${HA_WEBHOOKError_URL}
       #webhook url for triggering next app after finishing this tasks
    
 
