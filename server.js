@@ -6,6 +6,9 @@ import { loginQB } from "./qbittorrent/qb.js";
 import { triggerHomeAssistantWebhook ,triggerHAWebhookWhenErrorOccurs } from "./homeassitant/homeAssistantWebhook.js";
 import { log } from "./timelog.js";
 import { publishMessage } from "./queue/publishMessage.js";
+import { retry } from "./homeassitant/RetryWrapper.js";
+
+
 
 async function main() {
   try {
@@ -33,11 +36,10 @@ async function main() {
   message: "torrent cleaning process completed successfully 🎉"
 });
    await delay(1000,true);
-    await triggerHomeAssistantWebhook({
-  status: "success",
-  message: "Torrent cleaning completed",
-  time: new Date().toISOString(),
-});
+
+ await retry (triggerHomeAssistantWebhook)
+
+
 
     console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
         await publishMessage({
@@ -49,7 +51,7 @@ async function main() {
             await publishMessage({
   message: "❌ Fatal error in main():"
 });
-    await triggerHAWebhookWhenErrorOccurs()
+     await retry (triggerHAWebhookWhenErrorOccurs)
   }
 }
 

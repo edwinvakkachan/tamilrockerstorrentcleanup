@@ -1,5 +1,5 @@
 import { qb } from "./qb.js";
-import { sendMessage } from "../telegram/sendTelegramMessage.js";
+import { publishMessage } from "../queue/publishMessage.js";
 import { delay } from "../delay.js";
 const TWO_GB = 2 * 1024 * 1024 * 1024;
 
@@ -47,28 +47,8 @@ function extractMovieKey(name) {
     .toLowerCase();
 }
 
-/**
- * Select best torrent from a group
- */
-// function selectBestTorrent(torrents) {
-//   // Prefer 1080p under 2GB
-//   const candidates = torrents.filter(t =>
-//     /1080p/i.test(t.name) && t.size < TWO_GB
-//   );
 
-//   if (candidates.length > 0) {
-//     return candidates.sort((a, b) => b.size - a.size)[0];
-//   }
 
-//   // fallback: best overall under 2GB
-//   const under2gb = torrents.filter(t => t.size < TWO_GB);
-//   if (under2gb.length > 0) {
-//     return under2gb.sort((a, b) => b.size - a.size)[0];
-//   }
-
-//   // final fallback: largest
-//   return torrents.sort((a, b) => b.size - a.size)[0];
-// }
 
 function selectBestTorrent(torrents) {
 
@@ -123,10 +103,11 @@ function selectBestTorrent(torrents) {
 export async function cleanupTodayTorrents() {
   // const tag = getTodayTag();
   const tag = 'script';
-  // await sendMessage(`📅 today date  is ${tag}`)
-  // console.log(`📅 today is ${tag}`)
-  
-  console.log(`searching tag is ${tag}`)
+ 
+      await publishMessage({
+      message: `The searching tag in QB is ${tag}`
+    });
+  console.log(`The searching tag in QB is ${tag}`)
 
   const torrents = await getTorrentsByTag(tag);
 
@@ -134,7 +115,9 @@ export async function cleanupTodayTorrents() {
 
   if (!torrents.length) {
     console.log("🚨 No torrents found for today.");
-    // await sendMessage("🚨 No torrents found for today.")
+        await publishMessage({
+      message: "🚨 No torrents found for today."
+    });
     return;
   }
 
@@ -159,7 +142,9 @@ export async function cleanupTodayTorrents() {
     const best = selectBestTorrent(group);
 
     console.log(`⭐ Keeping for "${movie}":`, best.name);
-    // await sendMessage(`⭐ Keeping  "${best.name}":`)
+        await publishMessage({
+      message: `⭐ Keeping  "${best.name}":`
+    });
     group
       .filter(t => t.hash !== best.hash)
       .forEach(t => hashesToDelete.push(t.hash));
@@ -173,11 +158,16 @@ export async function cleanupTodayTorrents() {
     await deleteTorrents(hashesToDelete);
     
     console.log("⚠️ Duplicate torrents deleted.");
-    // await sendMessage('⚠️ Duplicate torrents deleted.');
+
+        await publishMessage({
+      message: '⚠️ Duplicate torrents deleted.'
+    });
 
   } else {
     console.log("⚠️ No duplicates found.");
-    // await sendMessage('⚠️ No duplicates found.');
+        await publishMessage({
+      message: '⚠️ No duplicates found.'
+    });
   }
 }
 
@@ -194,7 +184,10 @@ export async function moveTodayShowsToTV() {
   });
   if (!torrents.length) {
     console.log("👍 No torrents found for today");
-    // await sendMessage("👍 No torrents found for today")
+
+        await publishMessage({
+      message: "👍 No torrents found for today"
+    });
     return;
   }
 
@@ -239,7 +232,10 @@ export async function moveTodayShowsToTV() {
 
   if (!showTorrents.length) {
     console.log("👍 No shows found for today");
-    // await sendMessage("👍 No shows found for today")
+
+        await publishMessage({
+      message: "👍 No shows found for today"
+    });
     return;
   }
 
@@ -253,6 +249,8 @@ export async function moveTodayShowsToTV() {
       category: "Qbit2tbTV"
     })
   );
-  // await sendMessage(`🔔 Moved ${showTorrents.length} shows to Qbit2tbTV`)
+      await publishMessage({
+      message: `🔔 Moved ${showTorrents.length} shows to Qbit2tbTV`
+    });
   console.log(`🔔 Moved ${showTorrents.length} shows to Qbit2tbTV`);
 }

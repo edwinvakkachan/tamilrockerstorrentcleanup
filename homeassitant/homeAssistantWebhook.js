@@ -1,6 +1,5 @@
 import axios from "axios";
 import { delay } from "../delay.js";
-import { sendMessage } from "../telegram/sendTelegramMessage.js";
 
 const HA_WEBHOOK_URL = process.env.HA_WEBHOOK_URL; 
 
@@ -25,7 +24,9 @@ console.log("✅ Home Assistant webhook triggered:", response.status);
 return ;
   } catch (error) {
     console.error("❌ Failed to trigger Home Assistant webhook");
-    await sendMessage("❌ Failed to trigger Home Assistant webhook for files to traktv db add");
+        await publishMessage({
+      message: "❌ Failed to trigger Home Assistant webhook for files to traktv db add"
+    });
     console.error(error.message);
   }
 }

@@ -4,12 +4,7 @@ import 'dotenv/config';
 
 
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
+import pool from "./pool.js";
 
 export async function initDB() {
   await pool.query(`
