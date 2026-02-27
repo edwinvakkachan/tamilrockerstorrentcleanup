@@ -13,15 +13,13 @@ import { retry } from "./homeassitant/RetryWrapper.js";
 async function main() {
   try {
     
-    console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
-    await publishMessage({
-  message: "🥑🥑🥑🥑🥑🥑🥑🥑🥑"
-});
+    await log();
+
     console.log("🚀 torrent cleaning process started");
     await publishMessage({
   message: "🚀 torrent cleaning process started"
 });
-    await log();
+   
 
     await loginQB()
     await delay(2000,true)
