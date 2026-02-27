@@ -2,7 +2,7 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export async function retry(fn, payload, name, maxRetries = 5) {
+export async function retry(fn, payload, name, maxRetries = 3) {
   let attempt = 0;
   let delay = 3000;
 

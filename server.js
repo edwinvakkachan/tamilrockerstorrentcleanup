@@ -3,7 +3,7 @@
 import { delay } from "./delay.js";
 import { cleanupTodayTorrents,moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
 import { loginQB } from "./qbittorrent/qb.js";
-import { triggerHomeAssistantWebhook ,triggerHAWebhookWhenErrorOccurs } from "./homeassitant/homeAssistantWebhook.js";
+import { triggerHomeAssistantWebhook ,triggerHomeAssistantWebhookWhenErrorOccurs } from "./homeassitant/homeAssistantWebhook.js";
 import { log } from "./timelog.js";
 import { publishMessage } from "./queue/publishMessage.js";
 import { retry } from "./homeassitant/RetryWrapper.js";
@@ -12,6 +12,8 @@ import { retry } from "./homeassitant/RetryWrapper.js";
 
 async function main() {
   try {
+
+
     
     await log();
 
@@ -35,9 +37,14 @@ async function main() {
 });
    await delay(1000,true);
 
- await retry (triggerHomeAssistantWebhook)
+ 
 
-
+    await retry(
+  triggerHomeAssistantWebhook,
+  { status: "success" },
+  "homeassistant-success",
+  5
+);
 
     console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
         await publishMessage({
@@ -49,7 +56,12 @@ async function main() {
             await publishMessage({
   message: "❌ Fatal error in main():"
 });
-     await retry (triggerHAWebhookWhenErrorOccurs)
+    await retry(
+  triggerHomeAssistantWebhookWhenErrorOccurs,
+  { status: "error" },
+  "homeassistant-error",
+  5
+);
   }
 }
 

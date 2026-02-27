@@ -2,55 +2,56 @@ import axios from "axios";
 import { delay } from "../delay.js";
 
 const HA_WEBHOOK_URL = process.env.HA_WEBHOOK_URL; 
+const HA_WEBHOOKError_URL = process.env.HA_WEBHOOKError_URL;
 
 // Example: http://192.168.0.50:8123/api/webhook/your_webhook_id
 
 export async function triggerHomeAssistantWebhook(payload = {}) {
+  if (!HA_WEBHOOK_URL) {
+    throw new Error("HA_WEBHOOK_URL not set");
+  }
+
   try {
-    if (!HA_WEBHOOK_URL) {
-      console.warn("⚠️ HA_WEBHOOK_URL not set in .env");
-      return;
-    }
+    const response = await axios.post(
+      HA_WEBHOOK_URL,
+      payload,
+      {
+        headers: { "Content-Type": "application/json" },
+        timeout: 5000,
+      }
+    );
 
-    const response = await axios.post(HA_WEBHOOK_URL,{
-      headers: {
-        "Content-Type": "application/json",
-      },
-      timeout: 30000,
-    });
-await delay(10000,true)
+    console.log("✅ Home Assistant webhook triggered:", response.status);
+    return response.data;
 
-console.log("✅ Home Assistant webhook triggered:", response.status);
-return ;
   } catch (error) {
-    console.error("❌ Failed to trigger Home Assistant webhook");
-        await publishMessage({
-      message: "❌ Failed to trigger Home Assistant webhook for files to traktv db add"
-    });
-    console.error(error.message);
+    console.error("❌ Failed to trigger Home Assistant webhook:", error.message);
+    throw error;   // REQUIRED
   }
 }
 
 
-export async function triggerHAWebhookWhenErrorOccurs(errorMessage="") {
+export async function triggerHomeAssistantWebhookWhenErrorOccurs(payload = {}) {
+ 
+  if (!HA_WEBHOOKError_URL) {
+    throw new Error("HA_WEBHOOKError_URL not set");
+  }
+
   try {
-    await axios.post(
-      `${config.HA_WEBHOOKError_URL}`,
-      
+    const response = await axios.post(
+      HA_WEBHOOKError_URL,
+      payload,
       {
-        headers: {
-          "Content-Type": "application/json"
-        },
-        timeout: 10000
+        headers: { "Content-Type": "application/json" },
+        timeout: 5000,
       }
     );
 
-    console.log("🏠 Home Assistant webhook triggered for running again");
-    // await sendTelegramMessage("🏠 Home Assistant webhook triggered")
-    await delay(10000,true);
-    return;
-  } catch (err) {
-    console.error("⚠️ Failed to trigger HA webhook ERROR url:", err.message);
-    await sendTelegramMessage("⚠️ Failed to trigger HA webhook ERROR url")
+    console.log("✅ Home Assistant webhook Error URL triggered:", response.status);
+    return response.data;
+
+  } catch (error) {
+    console.error("❌ Failed to trigger Home Assistant webhook Error URL :", error.message);
+    throw error;   // REQUIRED
   }
 }
