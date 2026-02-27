@@ -1,17 +1,23 @@
 
 // import { addToTorrent } from "./addTOTorrent.js";
 import { delay } from "./delay.js";
-import { sendMessage } from "./telegram/sendTelegramMessage.js";
 import { cleanupTodayTorrents,moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
 import { loginQB } from "./qbittorrent/qb.js";
 import { triggerHomeAssistantWebhook ,triggerHAWebhookWhenErrorOccurs } from "./homeassitant/homeAssistantWebhook.js";
 import { log } from "./timelog.js";
+import { publishMessage } from "./queue/publishMessage.js";
 
 async function main() {
   try {
     
     console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
+    await publishMessage({
+  message: "🥑🥑🥑🥑🥑🥑🥑🥑🥑"
+});
     console.log("🚀 torrent cleaning process started");
+    await publishMessage({
+  message: "🚀 torrent cleaning process started"
+});
     await log();
 
     await loginQB()
@@ -23,7 +29,9 @@ async function main() {
     await moveTodayShowsToTV();
 
     console.log("torrent cleaning process completed successfully 🎉");
-    await sendMessage("torrent cleaning process completed successfully 🎉")
+       await publishMessage({
+  message: "torrent cleaning process completed successfully 🎉"
+});
    await delay(1000,true);
     await triggerHomeAssistantWebhook({
   status: "success",
@@ -32,10 +40,15 @@ async function main() {
 });
 
     console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
+        await publishMessage({
+  message: "🥑🥑🥑🥑🥑🥑🥑🥑🥑"
+});
   } catch (error) {
     console.error("Fatal error in main():");
     console.error(error);
-    await sendMessage("❌ Fatal error in main():")
+            await publishMessage({
+  message: "❌ Fatal error in main():"
+});
     await triggerHAWebhookWhenErrorOccurs()
   }
 }
