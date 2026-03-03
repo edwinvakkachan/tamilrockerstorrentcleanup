@@ -54,6 +54,10 @@ function selectBestTorrent(torrents) {
 
   const TWO_GB = 2 * 1024 * 1024 * 1024;
 
+  function isPreDVD(name) {
+    return /\bpredvd\b/i.test(name);
+  }
+
   function detectLanguagePriority(name) {
     const lower = name.toLowerCase();
 
@@ -70,12 +74,23 @@ function selectBestTorrent(torrents) {
 
   function sortByLanguageAndSize(list) {
     return [...list].sort((a, b) => {
+
+      // 1️⃣ Prefer NON-PreDVD
+      const aPre = isPreDVD(a.name);
+      const bPre = isPreDVD(b.name);
+
+      if (aPre !== bPre) {
+        return aPre ? 1 : -1;
+      }
+
+      // 2️⃣ Language priority
       const langDiff =
         detectLanguagePriority(b.name) -
         detectLanguagePriority(a.name);
 
       if (langDiff !== 0) return langDiff;
 
+      // 3️⃣ Larger size wins
       return b.size - a.size;
     });
   }
@@ -96,7 +111,7 @@ function selectBestTorrent(torrents) {
     return sortByLanguageAndSize(under2gb)[0];
   }
 
-  // 3️⃣ Final fallback: everything
+  // 3️⃣ Final fallback
   return sortByLanguageAndSize(torrents)[0];
 }
 
