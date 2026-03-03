@@ -65,7 +65,7 @@ const showTorrents = torrents.filter(t => {
   return isMalayalam && isPreDVD;
 });
 
-await renameFilesForTorrents(showTorrents); 
+// await renameFilesForTorrents(showTorrents); 
 
   if (!showTorrents.length) {
     console.log("👍 No Predvd shows found for today");
