@@ -2,6 +2,37 @@ import { qb } from "./qb.js";
 import { publishMessage } from "../queue/publishMessage.js";
 
 
+async function renameFilesForTorrents(torrents) {
+  for (const torrent of torrents) {
+
+    // Get files inside torrent
+    const { data: files } = await qb.get(
+      "/api/v2/torrents/files",
+      { params: { hash: torrent.hash } }
+    );
+
+    for (const file of files) {
+
+      const cleanedName = file.name.replace(
+        /^www\.1TamilMV\.gs\s*-\s*/i,
+        ""
+      );
+
+      if (cleanedName !== file.name) {
+        await qb.post(
+  "/api/v2/torrents/rename",
+  new URLSearchParams({
+    hash: torrent.hash,
+    name: cleanedName
+  })
+);
+
+        console.log(`Renamed: ${file.name} → ${cleanedName}`);
+      }
+    }
+  }
+}
+
 
 export async function selectPredvd() {
   const today = new Date().toISOString().split("T")[0];
@@ -22,17 +53,19 @@ export async function selectPredvd() {
   }
 
   // 2️⃣ Identify predvd
-  const showTorrents = torrents.filter(t => {
+const showTorrents = torrents.filter(t => {
   const name = t.name.toLowerCase();
 
-  return (
-    /\bmalayalam\b/i.test(name) && /\bpredvd\b/i.test(name)  ||
+  const isMalayalam =
+    /\bmalayalam\b/i.test(name) ||
+    /\bmal\b/i.test(name);
 
-    /\b\mal\b/i.test(name) && /\bpredvd\b/i.test(name)
-  );
+  const isPreDVD = /\bpredvd\b/i.test(name);
+
+  return isMalayalam && isPreDVD;
 });
 
-
+await renameFilesForTorrents(showTorrents); 
 
   if (!showTorrents.length) {
     console.log("👍 No Predvd shows found for today");
@@ -44,6 +77,15 @@ export async function selectPredvd() {
   }
 
   const hashes = showTorrents.map(t => t.hash).join("|");
+  
+  // added a tag called pre dvd
+  await qb.post(
+  "/api/v2/torrents/addTags",
+  new URLSearchParams({
+    hashes,
+    tags: "predvd"
+  })
+);
 
   // 3️⃣ Change category
   await qb.post(
