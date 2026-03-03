@@ -6,7 +6,7 @@ import { triggerHomeAssistantWebhook ,triggerHomeAssistantWebhookWhenErrorOccurs
 import { log } from "./timelog.js";
 import { publishMessage } from "./queue/publishMessage.js";
 import { retry } from "./homeassitant/RetryWrapper.js";
-
+import { selectPredvd } from "./qbittorrent/predvd.js";
 
 
 async function main() {
@@ -24,6 +24,9 @@ async function main() {
 
     await loginQB()
     await delay(2000,true)
+    await selectPredvd();
+
+    await delay(5000,true)
 
     await cleanupTodayTorrents();
     await delay(2000,true)
