@@ -72,10 +72,14 @@ function selectBestTorrent(torrents) {
     return 0;
   }
 
+  function isMalayalam(name) {
+    return /\b(malayalam|mal)\b/i.test(name);
+  }
+
   function sortByLanguageAndSize(list) {
     return [...list].sort((a, b) => {
 
-      // 1️⃣ Prefer NON-PreDVD
+      // 1️⃣ Avoid PreDVD
       const aPre = isPreDVD(a.name);
       const bPre = isPreDVD(b.name);
 
@@ -90,12 +94,46 @@ function selectBestTorrent(torrents) {
 
       if (langDiff !== 0) return langDiff;
 
-      // 3️⃣ Larger size wins
+      // 3️⃣ Larger size preferred
       return b.size - a.size;
     });
   }
 
-  // 1️⃣ Prefer 1080p under 2GB
+  /* ------------------------------
+     1️⃣ Malayalam override logic
+  ------------------------------ */
+
+  const malayalamTorrents = torrents.filter(t =>
+    isMalayalam(t.name) && t.size < TWO_GB
+  );
+
+  if (malayalamTorrents.length > 0) {
+
+    // Prefer 1080p Malayalam
+    const mal1080 = malayalamTorrents.filter(t =>
+      /1080p/i.test(t.name)
+    );
+
+    if (mal1080.length > 0) {
+      return sortByLanguageAndSize(mal1080)[0];
+    }
+
+    // Otherwise allow 720p Malayalam
+    const mal720 = malayalamTorrents.filter(t =>
+      /720p/i.test(t.name)
+    );
+
+    if (mal720.length > 0) {
+      return sortByLanguageAndSize(mal720)[0];
+    }
+
+    return sortByLanguageAndSize(malayalamTorrents)[0];
+  }
+
+  /* ------------------------------
+     2️⃣ Original logic
+  ------------------------------ */
+
   const candidates = torrents.filter(t =>
     /1080p/i.test(t.name) && t.size < TWO_GB
   );
@@ -104,14 +142,12 @@ function selectBestTorrent(torrents) {
     return sortByLanguageAndSize(candidates)[0];
   }
 
-  // 2️⃣ Fallback: any under 2GB
   const under2gb = torrents.filter(t => t.size < TWO_GB);
 
   if (under2gb.length > 0) {
     return sortByLanguageAndSize(under2gb)[0];
   }
 
-  // 3️⃣ Final fallback
   return sortByLanguageAndSize(torrents)[0];
 }
 
