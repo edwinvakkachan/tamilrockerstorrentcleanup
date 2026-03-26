@@ -47,10 +47,64 @@ function extractMovieKey(name) {
     .toLowerCase();
 }
 
+// select tv torrents
+function isTVShow(name) {
+  return /S\d{1,2}\s?EP/i.test(name);
+}
 
+function isMalayalam(name) {
+  return /\b(malayalam|mal)\b/i.test(name);
+}
+
+function sortTVTorrents(list) {
+  const FIVE_GB = 5 * 1024 * 1024 * 1024;
+
+  return [...list]
+    .filter(t => t.size < FIVE_GB) // size limit
+    .sort((a, b) => {
+
+      // Avoid PreDVD
+      const aPre = /predvd/i.test(a.name);
+      const bPre = /predvd/i.test(b.name);
+      if (aPre !== bPre) return aPre ? 1 : -1;
+
+      // Prefer 1080p
+      const a1080 = /1080p/i.test(a.name);
+      const b1080 = /1080p/i.test(b.name);
+      if (a1080 !== b1080) return b1080 ? 1 : -1;
+
+      // Prefer Malayalam
+      const aMal = isMalayalam(a.name);
+      const bMal = isMalayalam(b.name);
+      if (aMal !== bMal) return bMal ? 1 : -1;
+
+      // Prefer HEVC
+      const aHevc = /hevc|x265/i.test(a.name);
+      const bHevc = /hevc|x265/i.test(b.name);
+      if (aHevc !== bHevc) return bHevc ? 1 : -1;
+
+      // Prefer WEB-DL
+      const aWeb = /web[- ]dl/i.test(a.name);
+      const bWeb = /web[- ]dl/i.test(b.name);
+      if (aWeb !== bWeb) return bWeb ? 1 : -1;
+
+      // Larger size = better quality
+      return b.size - a.size;
+    });
+}
 
 
 function selectBestTorrent(torrents) {
+
+  // TV Show logic
+const tvTorrents = torrents.filter(t => isTVShow(t.name));
+
+if (tvTorrents.length > 0) {
+  const sortedTV = sortTVTorrents(tvTorrents);
+  if (sortedTV.length > 0) {
+    return sortedTV[0];
+  }
+}
 
   const TWO_GB = 2 * 1024 * 1024 * 1024;
 

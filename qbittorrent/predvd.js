@@ -44,10 +44,10 @@ export async function selectPredvd() {
     }
   });
   if (!torrents.length) {
-    console.log("👍 No  torrents found for today");
+    console.log("👍 No Predvd torrents found for today");
 
         await publishMessage({
-      message: "👍 No torrents found for today"
+      message: "👍 No Predvd  torrents found for today"
     });
     return;
   }
