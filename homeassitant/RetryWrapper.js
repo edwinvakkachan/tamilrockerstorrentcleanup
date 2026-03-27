@@ -4,7 +4,7 @@ function sleep(ms) {
 
 export async function retry(fn, payload, name, maxRetries = 3) {
   let attempt = 0;
-  let delay = 3000;
+  let delay = 30000;
 
   while (attempt < maxRetries) {
     try {
@@ -24,7 +24,7 @@ export async function retry(fn, payload, name, maxRetries = 3) {
       }
 
       await sleep(delay);
-      delay *= 10;
+      // delay *= 10;
     }
   }
 }
