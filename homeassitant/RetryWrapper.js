@@ -24,7 +24,7 @@ export async function retry(fn, payload, name, maxRetries = 3) {
       }
 
       await sleep(delay);
-      delay *= 2;
+      delay *= 10;
     }
   }
 }
