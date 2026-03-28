@@ -209,7 +209,10 @@ export async function cleanupTodayTorrents() {
   await delay(2000, true);
 
   if (!torrents.length) {
-    console.log("🚨 No torrents found for today.");
+    console.log("🚨 No torrents found for today cleanup.");
+            await publishMessage({
+  message: "🍁🍁 No torrents found for today cleanup."
+});
     return;
   }
 
@@ -232,6 +235,9 @@ export async function cleanupTodayTorrents() {
     const best = selectBestTorrent(group);
 
     console.log(`⭐ Keeping for "${movie}":`, best.name);
+                await publishMessage({
+  message: `🍁🍁 Keeping for ${movie}: \n ${best.name}`
+});
 
     group
       .filter(t => t.hash !== best.hash)
