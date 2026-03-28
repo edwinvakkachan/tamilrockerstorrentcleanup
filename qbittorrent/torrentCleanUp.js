@@ -233,6 +233,19 @@ export async function cleanupTodayTorrents() {
     if (group.length === 1) continue;
 
     const best = selectBestTorrent(group);
+// loging the movies 
+
+     await publishMessage({
+  message: `🍁🍁🍁🍁🍁🍁 `
+});
+
+    for (let key in group){
+      console.log(group[key].name)
+ 
+      await publishMessage({
+  message: `⭐ ${group[key].name} \n`
+});
+    }
 
     console.log(`⭐ Keeping for "${movie}":`, best.name);
                 await publishMessage({
