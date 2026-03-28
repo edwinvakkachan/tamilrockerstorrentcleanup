@@ -209,9 +209,9 @@ export async function cleanupTodayTorrents() {
   await delay(2000, true);
 
   if (!torrents.length) {
-    console.log("🚨 No torrents found for today cleanup.");
+    console.log("🥰 No torrents found for today cleanup.");
             await publishMessage({
-  message: "🍁🍁 No torrents found for today cleanup."
+  message: "🥰🥰 No torrents found for today cleanup."
 });
     return;
   }
@@ -247,7 +247,7 @@ export async function cleanupTodayTorrents() {
 });
     }
 
-    console.log(`⭐ Keeping for "${movie}":`, best.name);
+    console.log(`🍁🍁 Keeping for "${movie}":`, best.name);
                 await publishMessage({
   message: `🍁🍁 Keeping for ${movie}: \n ${best.name}`
 });
@@ -276,10 +276,10 @@ export async function moveTodayShowsToTV() {
     }
   });
   if (!torrents.length) {
-    console.log("👍 No torrents found for today");
+    console.log("😢 No tv shows torrent found for today for moving");
 
         await publishMessage({
-      message: "👍 No torrents found for today"
+      message: "😢 No tv shows torrent found for today for moving"
     });
     return;
   }
@@ -324,10 +324,10 @@ export async function moveTodayShowsToTV() {
 
 
   if (!showTorrents.length) {
-    console.log("👍 No shows found for today");
+    console.log("🤬 No shows found for today");
 
         await publishMessage({
-      message: "👍 No shows found for today"
+      message: "🤬 No shows found for today"
     });
     return;
   }
@@ -343,7 +343,7 @@ export async function moveTodayShowsToTV() {
     })
   );
       await publishMessage({
-      message: `🔔 Moved ${showTorrents.length} shows to Qbit2tbTV`
+      message: `😇 Moved ${showTorrents.length} shows to Qbit2tbTV`
     });
-  console.log(`🔔 Moved ${showTorrents.length} shows to Qbit2tbTV`);
+  console.log(`😇 Moved ${showTorrents.length} shows to Qbit2tbTV`);
 }
