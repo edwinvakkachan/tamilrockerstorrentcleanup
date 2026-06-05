@@ -15,7 +15,7 @@ function isTVShow(name) {
 }
 
 function isMalayalam(name) {
-  return /\b(malayalam|mal)\b/i.test(name);
+  return hasFullMalayalam(name) || hasMalayalamCode(name);
 }
 
 function isPreDVD(name) {
@@ -43,16 +43,37 @@ function getTorrentSize(torrent) {
   return parseSizeFromName(torrent.name) ?? torrent.size ?? 0;
 }
 
+function hasFullMalayalam(name) {
+  return /\bmalayalam\b/i.test(name);
+}
+
+function hasMalayalamCode(name) {
+  return /\bmal\b/i.test(name);
+}
+
+function hasFullHindi(name) {
+  return /\bhindi\b/i.test(name);
+}
+
+function hasHindiCode(name) {
+  return /\bhin\b/i.test(name);
+}
+
+function hasFullTamil(name) {
+  return /\btamil\b/i.test(name);
+}
+
+function hasTamilCode(name) {
+  return /\btam\b/i.test(name);
+}
+
 function detectLanguagePriority(name) {
-  const lower = name.toLowerCase();
-
-  const hasMalayalam = /\b(malayalam|mal)\b/i.test(lower);
-  const hasHindi = /\b(hindi|hin)\b/i.test(lower);
-  const hasTamil = /\b(tamil|tam)\b/i.test(lower);
-
-  if (hasMalayalam) return 3;
-  if (hasHindi) return 2;
-  if (hasTamil) return 1;
+  if (hasFullMalayalam(name)) return 60;
+  if (hasMalayalamCode(name)) return 50;
+  if (hasFullHindi(name)) return 40;
+  if (hasHindiCode(name)) return 30;
+  if (hasFullTamil(name)) return 20;
+  if (hasTamilCode(name)) return 10;
 
   return 0;
 }
@@ -132,26 +153,56 @@ function selectBestTorrent(torrents) {
     }
   }
 
-  const malayalamTorrents = torrents.filter(t => isMalayalam(t.name));
+  const fullMalayalamTorrents = torrents.filter(t => hasFullMalayalam(t.name));
 
-  if (malayalamTorrents.length > 0) {
-    const malayalam1080 = malayalamTorrents.filter(t =>
+  if (fullMalayalamTorrents.length > 0) {
+    const fullMalayalam1080 = fullMalayalamTorrents.filter(t =>
       /1080p/i.test(t.name)
     );
 
-    if (malayalam1080.length > 0) {
-      return sortByLanguageAndSize(malayalam1080)[0];
+    if (fullMalayalam1080.length > 0) {
+      return sortByLanguageAndSize(fullMalayalam1080)[0];
     }
 
-    const malayalam720 = malayalamTorrents.filter(t =>
+    const fullMalayalam720 = fullMalayalamTorrents.filter(t =>
       /720p/i.test(t.name)
     );
 
-    if (malayalam720.length > 0) {
-      return sortByLanguageAndSize(malayalam720)[0];
+    if (fullMalayalam720.length > 0) {
+      return sortByLanguageAndSize(fullMalayalam720)[0];
     }
 
-    return sortByLanguageAndSize(malayalamTorrents)[0];
+    return sortByLanguageAndSize(fullMalayalamTorrents)[0];
+  }
+
+  const malCodeTorrents = torrents.filter(t => hasMalayalamCode(t.name));
+
+  if (malCodeTorrents.length > 0) {
+    const malCode1080Under3gb = malCodeTorrents.filter(t =>
+      /1080p/i.test(t.name) && getTorrentSize(t) < THREE_GB
+    );
+
+    if (malCode1080Under3gb.length > 0) {
+      return sortByLanguageAndSize(malCode1080Under3gb)[0];
+    }
+
+    const malCode720 = malCodeTorrents.filter(t =>
+      /720p/i.test(t.name)
+    );
+
+    if (malCode720.length > 0) {
+      return sortByLanguageAndSize(malCode720)[0];
+    }
+
+    const malCode1080 = malCodeTorrents.filter(t =>
+      /1080p/i.test(t.name)
+    );
+
+    if (malCode1080.length > 0) {
+      return sortByLanguageAndSize(malCode1080)[0];
+    }
+
+    return sortByLanguageAndSize(malCodeTorrents)[0];
   }
 
   const preferred1080 = torrents.filter(t =>
