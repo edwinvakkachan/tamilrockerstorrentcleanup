@@ -132,6 +132,28 @@ function selectBestTorrent(torrents) {
     }
   }
 
+  const malayalamTorrents = torrents.filter(t => isMalayalam(t.name));
+
+  if (malayalamTorrents.length > 0) {
+    const malayalam1080 = malayalamTorrents.filter(t =>
+      /1080p/i.test(t.name)
+    );
+
+    if (malayalam1080.length > 0) {
+      return sortByLanguageAndSize(malayalam1080)[0];
+    }
+
+    const malayalam720 = malayalamTorrents.filter(t =>
+      /720p/i.test(t.name)
+    );
+
+    if (malayalam720.length > 0) {
+      return sortByLanguageAndSize(malayalam720)[0];
+    }
+
+    return sortByLanguageAndSize(malayalamTorrents)[0];
+  }
+
   const preferred1080 = torrents.filter(t =>
     /1080p/i.test(t.name) && getTorrentSize(t) < THREE_GB
   );
