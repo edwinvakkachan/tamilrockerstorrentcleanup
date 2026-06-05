@@ -4,7 +4,7 @@ function sleep(ms) {
 
 export async function retry(fn, payload, name, maxRetries = 3) {
   let attempt = 0;
-  let delay = 30000;
+  const delay = 30000;
 
   while (attempt < maxRetries) {
     try {
@@ -13,18 +13,17 @@ export async function retry(fn, payload, name, maxRetries = 3) {
 
       await fn(payload);
 
-      console.log(`✅ [${name}] Success`);
+      console.log(`[${name}] Success`);
       return true;
     } catch (err) {
-      console.error(`❌ [${name}] Failed`);
+      console.error(`[${name}] Failed`);
 
       if (attempt >= maxRetries) {
-        console.error(`🚨 [${name}] Max retries reached`);
+        console.error(`[${name}] Max retries reached`);
         return false;
       }
 
       await sleep(delay);
-      // delay *= 10;
     }
   }
 }

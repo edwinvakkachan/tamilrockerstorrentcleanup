@@ -44,7 +44,6 @@ function sortTVTorrents(list) {
   return [...list]
     .filter(t => t.size < FIVE_GB)
     .sort((a, b) => {
-
       // Avoid PreDVD
       const aPre = isPreDVD(a.name);
       const bPre = isPreDVD(b.name);
@@ -81,7 +80,6 @@ function sortTVTorrents(list) {
 
 function sortByLanguageAndSize(list) {
   return [...list].sort((a, b) => {
-
     // Avoid PreDVD
     const aPre = isPreDVD(a.name);
     const bPre = isPreDVD(b.name);
@@ -104,8 +102,6 @@ function sortByLanguageAndSize(list) {
 -------------------------------------------------- */
 
 function selectBestTorrent(torrents) {
-
-  // ---------- TV SHOW LOGIC ----------
   const tvTorrents = torrents.filter(t => isTVShow(t.name));
 
   if (tvTorrents.length > 0) {
@@ -114,8 +110,6 @@ function selectBestTorrent(torrents) {
       return sortedTV[0];
     }
   }
-
-  // ---------- MOVIE LOGIC ----------
 
   const preferred1080 = torrents.filter(t =>
     /1080p/i.test(t.name) && t.size < THREE_GB
@@ -181,22 +175,22 @@ export async function deleteTorrents(hashes) {
 }
 
 export async function cleanupTodayTorrents() {
-  const tag = 'script';
+  const tag = "script";
 
   await publishMessage({
-    message: `The searching tag in QB is ${tag}`
+    message: `Searching QB torrents with tag: ${tag}`
   });
 
-  console.log(`The searching tag in QB is ${tag}`);
+  console.log(`Searching QB torrents with tag: ${tag}`);
 
   const torrents = await getTorrentsByTag(tag);
   await delay(2000, true);
 
   if (!torrents.length) {
-    console.log("🥰 No torrents found for today cleanup.");
-            await publishMessage({
-  message: "🥰🥰 No torrents found for today cleanup."
-});
+    console.log("No torrents found for today cleanup");
+    await publishMessage({
+      message: "No torrents found for today cleanup"
+    });
     return;
   }
 
@@ -217,29 +211,29 @@ export async function cleanupTodayTorrents() {
     if (group.length === 1) continue;
 
     const best = selectBestTorrent(group);
-// loging the movies 
+    const separator = "========================================";
 
-console.log('✮✮✮✮✮ ✮✮✮✮✮ ➖➖➖➖ ✮✮✮✮✮')
-     await publishMessage({
-  message: `✮✮✮✮✮ ✮✮✮✮✮ ➖➖➖➖ ✮✮✮✮✮`
-});
+    console.log(separator);
+    await publishMessage({
+      message: separator
+    });
 
-  await publishMessage({
-  message: `🍁🍁 for ${movie} 🍁🍁 `
-});
-console.log(`🍁🍁  for ${movie} 🍁🍁 `)
-    for (let key in group){
-      console.log(`❎.  ${group[key].name} \n`)
- 
+    console.log(`Checking duplicates for: ${movie}`);
+    await publishMessage({
+      message: `Checking duplicates for: ${movie}`
+    });
+
+    for (const torrent of group) {
+      console.log(`Candidate: ${torrent.name}`);
       await publishMessage({
-  message: `❎.  ${group[key].name} \n`
-});
+        message: `Candidate: ${torrent.name}`
+      });
     }
 
-    console.log(`✔️. keeping \n ${best.name}`);
-  await publishMessage({
-  message: `✔️. keeping \n ${best.name}`
-});
+    console.log(`Keeping: ${best.name}`);
+    await publishMessage({
+      message: `Keeping: ${best.name}`
+    });
 
     group
       .filter(t => t.hash !== best.hash)
@@ -248,82 +242,76 @@ console.log(`🍁🍁  for ${movie} 🍁🍁 `)
 
   if (hashesToDelete.length) {
     await deleteTorrents(hashesToDelete);
-    console.log("⚠️ Duplicate torrents deleted.");
+    console.log("Duplicate torrents deleted");
   } else {
-    console.log("⚠️ No duplicates found.");
+    console.log("No duplicates found");
   }
 }
-
 
 export async function moveTodayShowsToTV() {
   const today = new Date().toISOString().split("T")[0];
 
-  // 1️⃣ Get torrents filtered by tag
+  // Get torrents filtered by today's tag.
   const { data: torrents } = await qb.get("/api/v2/torrents/info", {
     params: {
       tag: today
     }
   });
-  if (!torrents.length) {
-    console.log("😢 No tv shows torrent found for today for moving");
 
-        await publishMessage({
-      message: "😢 No tv shows torrent found for today for moving"
+  if (!torrents.length) {
+    console.log("No TV show torrents found for today");
+    await publishMessage({
+      message: "No TV show torrents found for today"
     });
     return;
   }
 
-  // 2️⃣ Identify shows (example logic: S01, S02, etc)
   const showTorrents = torrents.filter(t => {
-  const name = t.name;
+    const name = t.name;
 
-  return (
-    // Standard S01E05
-    /\bS\d{1,2}\s?E\d{1,2}\b/i.test(name) ||
+    return (
+      // Standard S01E05
+      /\bS\d{1,2}\s?E\d{1,2}\b/i.test(name) ||
 
-    // S01 EP 05 / S01 EP (01-10)
-    /\bS\d{1,2}\s?EP\b/i.test(name) ||
+      // S01 EP 05 / S01 EP (01-10)
+      /\bS\d{1,2}\s?EP\b/i.test(name) ||
 
-    // Just Season 1
-    /\bSeason\s?\d{1,2}\b/i.test(name) ||
+      // Just Season 1
+      /\bSeason\s?\d{1,2}\b/i.test(name) ||
 
-    // 1x05 format
-    /\b\d{1,2}x\d{1,2}\b/i.test(name) ||
+      // 1x05 format
+      /\b\d{1,2}x\d{1,2}\b/i.test(name) ||
 
-    // Episode 05
-    /\bEpisode\s?\d{1,3}\b/i.test(name) ||
+      // Episode 05
+      /\bEpisode\s?\d{1,3}\b/i.test(name) ||
 
-    // EP05 / E05 standalone
-    /\bEP?\s?\d{1,3}\b/i.test(name) ||
+      // EP05 / E05 standalone
+      /\bEP?\s?\d{1,3}\b/i.test(name) ||
 
-    // Complete Season Pack
-    /\bComplete\sSeason\b/i.test(name) ||
+      // Complete Season Pack
+      /\bComplete\sSeason\b/i.test(name) ||
 
-    // S01 (01-10)
-    /\bS\d{1,2}\s?\(\d+/i.test(name) ||
+      // S01 (01-10)
+      /\bS\d{1,2}\s?\(\d+/i.test(name) ||
 
-    // Multi episode indicators
-    /\bMulti\s?Episode\b/i.test(name) ||
+      // Multi episode indicators
+      /\bMulti\s?Episode\b/i.test(name) ||
 
-    // Volume based shows
-    /\bVol\s?\d+/i.test(name)
-  );
-});
-
-
+      // Volume based shows
+      /\bVol\s?\d+/i.test(name)
+    );
+  });
 
   if (!showTorrents.length) {
-    console.log("🤬 No shows found for today");
-
-        await publishMessage({
-      message: "🤬 No shows found for today"
+    console.log("No shows found for today");
+    await publishMessage({
+      message: "No shows found for today"
     });
     return;
   }
 
   const hashes = showTorrents.map(t => t.hash).join("|");
 
-  // 3️⃣ Change category
   await qb.post(
     "/api/v2/torrents/setCategory",
     new URLSearchParams({
@@ -331,8 +319,9 @@ export async function moveTodayShowsToTV() {
       category: "Qbit2tbTV"
     })
   );
-      await publishMessage({
-      message: `😇 Moved ${showTorrents.length} shows to Qbit2tbTV`
-    });
-  console.log(`😇 Moved ${showTorrents.length} shows to Qbit2tbTV`);
+
+  await publishMessage({
+    message: `Moved ${showTorrents.length} shows to Qbit2tbTV`
+  });
+  console.log(`Moved ${showTorrents.length} shows to Qbit2tbTV`);
 }

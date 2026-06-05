@@ -1,69 +1,64 @@
-
 import { delay } from "./delay.js";
-import { cleanupTodayTorrents,moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
+import { cleanupTodayTorrents, moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
 import { loginQB } from "./qbittorrent/qb.js";
-import { triggerHomeAssistantWebhook ,triggerHomeAssistantWebhookWhenErrorOccurs } from "./homeassitant/homeAssistantWebhook.js";
+import {
+  triggerHomeAssistantWebhook,
+  triggerHomeAssistantWebhookWhenErrorOccurs
+} from "./homeassitant/homeAssistantWebhook.js";
 import { log } from "./timelog.js";
 import { publishMessage } from "./queue/publishMessage.js";
 import { retry } from "./homeassitant/RetryWrapper.js";
 import { selectPredvd } from "./qbittorrent/predvd.js";
 
-
 async function main() {
   try {
-
-
-    
     await log();
 
-    console.log("🚀 torrent cleaning process started");
+    console.log("Torrent cleaning process started");
     await publishMessage({
-  message: "🚀 torrent cleaning process started"
-});
-   
+      message: "Torrent cleaning process started"
+    });
 
-    await loginQB()
-    await delay(2000,true)
+    await loginQB();
+    await delay(2000, true);
     await selectPredvd();
 
-    await delay(5000,true)
+    await delay(5000, true);
 
     await cleanupTodayTorrents();
-    await delay(2000,true)
+    await delay(2000, true);
 
     await moveTodayShowsToTV();
 
-    console.log("torrent cleaning process completed successfully 🎉");
-       await publishMessage({
-  message: "torrent cleaning process completed successfully 🎉"
-});
-   await delay(1000,true);
-
- 
+    console.log("Torrent cleaning process completed successfully");
+    await publishMessage({
+      message: "Torrent cleaning process completed successfully"
+    });
+    await delay(1000, true);
 
     await retry(
-  triggerHomeAssistantWebhook,
-  { status: "success" },
-  "homeassistant-success",
-  5
-);
+      triggerHomeAssistantWebhook,
+      { status: "success" },
+      "homeassistant-success",
+      5
+    );
 
-    console.log("🥑🥑🥑🥑🥑🥑🥑🥑🥑")
-        await publishMessage({
-  message: "🥑🥑🥑🥑🥑🥑🥑🥑🥑"
-});
+    console.log("Cleanup workflow finished");
+    await publishMessage({
+      message: "Cleanup workflow finished"
+    });
   } catch (error) {
     console.error("Fatal error in main():");
     console.error(error);
-            await publishMessage({
-  message: "❌ Fatal error in main():"
-});
+    await publishMessage({
+      message: "Fatal error in main():"
+    });
     await retry(
-  triggerHomeAssistantWebhookWhenErrorOccurs,
-  { status: "error" },
-  "homeassistant-error",
-  5
-);
+      triggerHomeAssistantWebhookWhenErrorOccurs,
+      { status: "error" },
+      "homeassistant-error",
+      5
+    );
   }
 }
 
