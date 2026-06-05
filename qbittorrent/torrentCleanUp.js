@@ -22,6 +22,27 @@ function isPreDVD(name) {
   return /\bpredvd\b/i.test(name);
 }
 
+function parseSizeFromName(name) {
+  const match = name.match(/\b(\d+(?:\.\d+)?)\s*(GB|GIB|MB|MIB)\b/i);
+
+  if (!match) return null;
+
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+
+  if (!Number.isFinite(value)) return null;
+
+  if (unit === "gb" || unit === "gib") {
+    return value * 1024 * 1024 * 1024;
+  }
+
+  return value * 1024 * 1024;
+}
+
+function getTorrentSize(torrent) {
+  return parseSizeFromName(torrent.name) ?? torrent.size ?? 0;
+}
+
 function detectLanguagePriority(name) {
   const lower = name.toLowerCase();
 
@@ -42,7 +63,7 @@ function detectLanguagePriority(name) {
 
 function sortTVTorrents(list) {
   return [...list]
-    .filter(t => t.size < FIVE_GB)
+    .filter(t => getTorrentSize(t) < FIVE_GB)
     .sort((a, b) => {
       // Avoid PreDVD
       const aPre = isPreDVD(a.name);
@@ -70,7 +91,7 @@ function sortTVTorrents(list) {
       if (aWeb !== bWeb) return bWeb ? 1 : -1;
 
       // Larger size
-      return b.size - a.size;
+      return getTorrentSize(b) - getTorrentSize(a);
     });
 }
 
@@ -93,7 +114,7 @@ function sortByLanguageAndSize(list) {
     if (langDiff !== 0) return langDiff;
 
     // Larger size preferred
-    return b.size - a.size;
+    return getTorrentSize(b) - getTorrentSize(a);
   });
 }
 
@@ -112,7 +133,7 @@ function selectBestTorrent(torrents) {
   }
 
   const preferred1080 = torrents.filter(t =>
-    /1080p/i.test(t.name) && t.size < THREE_GB
+    /1080p/i.test(t.name) && getTorrentSize(t) < THREE_GB
   );
 
   if (preferred1080.length > 0) {
@@ -127,7 +148,7 @@ function selectBestTorrent(torrents) {
     return sortByLanguageAndSize(fallback720)[0];
   }
 
-  const under2gb = torrents.filter(t => t.size < TWO_GB);
+  const under2gb = torrents.filter(t => getTorrentSize(t) < TWO_GB);
 
   if (under2gb.length > 0) {
     return sortByLanguageAndSize(under2gb)[0];
