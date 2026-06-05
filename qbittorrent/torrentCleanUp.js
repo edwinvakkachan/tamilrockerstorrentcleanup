@@ -3,6 +3,7 @@ import { publishMessage } from "../queue/publishMessage.js";
 import { delay } from "../delay.js";
 
 const TWO_GB = 2 * 1024 * 1024 * 1024;
+const THREE_GB = 3 * 1024 * 1024 * 1024;
 const FIVE_GB = 5 * 1024 * 1024 * 1024;
 
 /* --------------------------------------------------
@@ -116,37 +117,20 @@ function selectBestTorrent(torrents) {
 
   // ---------- MOVIE LOGIC ----------
 
-  const malayalamTorrents = torrents.filter(t =>
-    isMalayalam(t.name) && t.size < TWO_GB
+  const preferred1080 = torrents.filter(t =>
+    /1080p/i.test(t.name) && t.size < THREE_GB
   );
 
-  if (malayalamTorrents.length > 0) {
-
-    const mal1080 = malayalamTorrents.filter(t =>
-      /1080p/i.test(t.name)
-    );
-
-    if (mal1080.length > 0) {
-      return sortByLanguageAndSize(mal1080)[0];
-    }
-
-    const mal720 = malayalamTorrents.filter(t =>
-      /720p/i.test(t.name)
-    );
-
-    if (mal720.length > 0) {
-      return sortByLanguageAndSize(mal720)[0];
-    }
-
-    return sortByLanguageAndSize(malayalamTorrents)[0];
+  if (preferred1080.length > 0) {
+    return sortByLanguageAndSize(preferred1080)[0];
   }
 
-  const candidates = torrents.filter(t =>
-    /1080p/i.test(t.name) && t.size < TWO_GB
+  const fallback720 = torrents.filter(t =>
+    /720p/i.test(t.name)
   );
 
-  if (candidates.length > 0) {
-    return sortByLanguageAndSize(candidates)[0];
+  if (fallback720.length > 0) {
+    return sortByLanguageAndSize(fallback720)[0];
   }
 
   const under2gb = torrents.filter(t => t.size < TWO_GB);
