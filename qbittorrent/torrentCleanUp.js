@@ -670,7 +670,7 @@ export async function deleteTorrents(hashes) {
 }
 
 export async function cleanupTodayTorrents() {
-  const tag = "test";
+  const tag = "script";
 
   await publishMessage({
     message:
