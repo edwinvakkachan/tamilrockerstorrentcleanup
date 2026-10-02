@@ -210,15 +210,51 @@ function sortByLanguageAndSize(list) {
 -------------------------------------------------- */
 
 function selectBestTorrent(torrents) {
-  if (!torrents.length) {
+  if (!torrents || !torrents.length) {
     return null;
   }
 
   /*
-   * TV torrents:
-   * Keep existing TV-specific selection.
+   * ==================================================
+   * ONLY USE TORRENTS WITH VALID QBITTORRENT METADATA
+   * ==================================================
+   *
+   * Size is taken ONLY from:
+   *
+   *     torrent.size
+   *
+   * We do NOT read size from the torrent title.
+   *
+   * If metadata has not downloaded yet, qBittorrent
+   * can report size = 0. Such torrents are ignored.
    */
-  const tvTorrents = torrents.filter(t =>
+
+  const metadataReady = torrents.filter(t => {
+    const size = Number(t.size);
+
+    return (
+      Number.isFinite(size) &&
+      size > 0 &&
+      typeof t.name === "string" &&
+      t.name.trim() !== ""
+    );
+  });
+
+  if (!metadataReady.length) {
+    console.log(
+      "No torrents have valid qBittorrent metadata yet."
+    );
+
+    return null;
+  }
+
+  /*
+   * ==================================================
+   * TV SHOWS
+   * ==================================================
+   */
+
+  const tvTorrents = metadataReady.filter(t =>
     isTVShow(t.name)
   );
 
@@ -231,58 +267,28 @@ function selectBestTorrent(torrents) {
   }
 
   /*
-   * MOVIE SELECTION RULES
+   * ==================================================
+   * REMOVE PRE-DVD
+   * ==================================================
    *
-   * 1. Prefer Malayalam.
-   *
-   * 2. Prefer 1080p <= 3.5 GB.
-   *    Choose the smallest qualifying 1080p.
-   *
-   * 3. If no 1080p <= 3.5 GB exists:
-   *    If 720p exists, use 720p.
-   *
-   * 4. For 720p:
-   *    Prefer the largest file <= 2 GB.
-   *
-   * 5. If 720p exists but every 720p file is >2 GB:
-   *    choose the smallest 720p.
-   *
-   * 6. If no 720p exists:
-   *    keep 1080p even if it is >3.5 GB.
-   *
-   * 7. If neither 1080p nor 720p exists:
-   *    choose the highest available resolution.
-   *
-   * Examples:
-   *
-   * 1080p 1.8GB + 1080p 3.3GB
-   * -> 1080p 1.8GB
-   *
-   * 1080p 4GB + 720p 2GB + 720p 1.5GB
-   * -> 720p 2GB
-   *
-   * 1080p 4GB + 480p 720MB
-   * -> 1080p 4GB
-   *
-   * 4K 7GB + 480p 720MB
-   * -> 4K 7GB
+   * If normal releases exist, don't select PreDVD.
    */
 
-  /*
-   * Remove PreDVD when a normal release exists.
-   */
-  const nonPreDVD = torrents.filter(
+  const nonPreDVD = metadataReady.filter(
     t => !isPreDVD(t.name)
   );
 
   const candidates =
     nonPreDVD.length > 0
       ? nonPreDVD
-      : torrents;
+      : metadataReady;
 
   /*
-   * Prefer Malayalam.
+   * ==================================================
+   * MALAYALAM PREFERENCE
+   * ==================================================
    */
+
   const malayalamTorrents = candidates.filter(t =>
     isMalayalam(t.name)
   );
@@ -293,147 +299,127 @@ function selectBestTorrent(torrents) {
       : candidates;
 
   /*
-   * --------------------------------------------------
-   * 1080p
-   * --------------------------------------------------
+   * ==================================================
+   * HELPERS
+   * ==================================================
    */
 
-  const torrents1080 = pool.filter(t =>
-    getResolutionValue(t.name) === 1080
+  const sizeOf = torrent =>
+    Number(torrent.size);
+
+  const resolutionOf = torrent =>
+    getResolutionValue(torrent.name);
+
+  const is1080 = torrent =>
+    resolutionOf(torrent) === 1080;
+
+  const is720 = torrent =>
+    resolutionOf(torrent) === 720;
+
+  const isHEVC = torrent =>
+    /hevc|x265/i.test(torrent.name);
+
+  /*
+   * ==================================================
+   * 1. PREFER 1080p <= 3.5 GB
+   * ==================================================
+   *
+   * If multiple suitable 1080p files exist:
+   *
+   *     choose the SMALLEST actual torrent size.
+   *
+   * Example:
+   *
+   * 1080p 1.8 GB
+   * 1080p 2.4 GB
+   * 1080p 3.2 GB
+   *
+   * -> 1.8 GB
+   */
+
+  const MAX_1080_SIZE =
+    3.5 * 1024 * 1024 * 1024;
+
+  const suitable1080 = pool.filter(t =>
+    is1080(t) &&
+    sizeOf(t) <= MAX_1080_SIZE
   );
 
-  if (torrents1080.length > 0) {
+  if (suitable1080.length > 0) {
 
-    /*
-     * First choice:
-     *
-     * 1080p <= 3.5 GB
-     *
-     * Choose the smallest file.
-     */
-    const suitable1080 = torrents1080.filter(t =>
-      getTorrentSize(t) <= 3.5 * 1024 * 1024 * 1024
-    );
+    return [...suitable1080].sort(
+      (a, b) => {
 
-    if (suitable1080.length > 0) {
-      return sortByLanguageAndSize(
-        suitable1080
-      )[0];
-    }
+        /*
+         * Smallest actual qBittorrent size.
+         */
+        const sizeDiff =
+          sizeOf(a) - sizeOf(b);
 
-    /*
-     * No suitable 1080p.
-     *
-     * Check 720p before accepting a large 1080p.
-     */
-    const torrents720 = pool.filter(t =>
-      getResolutionValue(t.name) === 720
-    );
-
-    if (torrents720.length > 0) {
-
-      /*
-       * Prefer 720p <= 2 GB.
-       *
-       * Choose the largest file up to 2 GB.
-       */
-      const suitable720 = torrents720.filter(t =>
-        getTorrentSize(t) <=
-        2 * 1024 * 1024 * 1024
-      );
-
-      if (suitable720.length > 0) {
-
-        return [...suitable720].sort(
-          (a, b) => {
-
-            const sizeDiff =
-              getTorrentSize(b) -
-              getTorrentSize(a);
-
-            if (sizeDiff !== 0) {
-              return sizeDiff;
-            }
-
-            /*
-             * Same size:
-             * Prefer HEVC/x265.
-             */
-            const aHevc =
-              /hevc|x265/i.test(a.name);
-
-            const bHevc =
-              /hevc|x265/i.test(b.name);
-
-            if (aHevc !== bHevc) {
-              return bHevc ? 1 : -1;
-            }
-
-            return 0;
-          }
-        )[0];
-      }
-
-      /*
-       * 720p exists, but every 720p file
-       * is above 2 GB.
-       *
-       * Choose the smallest 720p.
-       */
-      return [...torrents720].sort(
-        (a, b) => {
-
-          const sizeDiff =
-            getTorrentSize(a) -
-            getTorrentSize(b);
-
-          if (sizeDiff !== 0) {
-            return sizeDiff;
-          }
-
-          const aHevc =
-            /hevc|x265/i.test(a.name);
-
-          const bHevc =
-            /hevc|x265/i.test(b.name);
-
-          if (aHevc !== bHevc) {
-            return bHevc ? 1 : -1;
-          }
-
-          return 0;
+        if (sizeDiff !== 0) {
+          return sizeDiff;
         }
-      )[0];
-    }
 
-    /*
-     * No 720p exists.
-     *
-     * Keep 1080p even if it is >3.5 GB.
-     */
-    return sortByLanguageAndSize(
-      torrents1080
+        /*
+         * Same size:
+         * Prefer HEVC/x265.
+         */
+        const hevcDiff =
+          Number(isHEVC(b)) -
+          Number(isHEVC(a));
+
+        if (hevcDiff !== 0) {
+          return hevcDiff;
+        }
+
+        /*
+         * Same size/codec:
+         * Prefer WEB-DL.
+         */
+        const aWeb =
+          /web[- ]dl/i.test(a.name);
+
+        const bWeb =
+          /web[- ]dl/i.test(b.name);
+
+        return Number(bWeb) - Number(aWeb);
+      }
     )[0];
   }
 
   /*
-   * --------------------------------------------------
-   * No 1080p
-   * --------------------------------------------------
+   * ==================================================
+   * 2. NO SUITABLE 1080p
+   *
+   * LOOK FOR 720p
+   * ==================================================
    */
 
-  const torrents720 = pool.filter(t =>
-    getResolutionValue(t.name) === 720
-  );
+  const torrents720 = pool.filter(is720);
 
   if (torrents720.length > 0) {
 
+    const MAX_720_SIZE =
+      2 * 1024 * 1024 * 1024;
+
     /*
-     * Prefer largest 720p up to 2 GB.
+     * --------------------------------------------------
+     * 720p <= 2 GB
+     * --------------------------------------------------
+     *
+     * Choose the LARGEST file up to 2 GB.
+     *
+     * Example:
+     *
+     * 720p 700 MB
+     * 720p 1.5 GB
+     * 720p 2.0 GB
+     *
+     * -> 2.0 GB
      */
+
     const suitable720 = torrents720.filter(t =>
-      getTorrentSize(t) <=
-      2 * 1024 * 1024 * 1024
+      sizeOf(t) <= MAX_720_SIZE
     );
 
     if (suitable720.length > 0) {
@@ -441,52 +427,67 @@ function selectBestTorrent(torrents) {
       return [...suitable720].sort(
         (a, b) => {
 
+          /*
+           * Largest file first.
+           */
           const sizeDiff =
-            getTorrentSize(b) -
-            getTorrentSize(a);
+            sizeOf(b) - sizeOf(a);
 
           if (sizeDiff !== 0) {
             return sizeDiff;
           }
 
-          const aHevc =
-            /hevc|x265/i.test(a.name);
+          /*
+           * Same size:
+           * Prefer HEVC/x265.
+           */
+          const hevcDiff =
+            Number(isHEVC(b)) -
+            Number(isHEVC(a));
 
-          const bHevc =
-            /hevc|x265/i.test(b.name);
-
-          if (aHevc !== bHevc) {
-            return bHevc ? 1 : -1;
+          if (hevcDiff !== 0) {
+            return hevcDiff;
           }
 
-          return 0;
+          /*
+           * Same size/codec:
+           * Prefer WEB-DL.
+           */
+          const aWeb =
+            /web[- ]dl/i.test(a.name);
+
+          const bWeb =
+            /web[- ]dl/i.test(b.name);
+
+          return Number(bWeb) - Number(aWeb);
         }
       )[0];
     }
 
     /*
-     * 720p exists but all files are >2 GB.
+     * --------------------------------------------------
+     * 720p EXISTS BUT ALL ARE > 2 GB
+     * --------------------------------------------------
+     *
      * Choose the smallest 720p.
      */
+
     return [...torrents720].sort(
       (a, b) => {
 
         const sizeDiff =
-          getTorrentSize(a) -
-          getTorrentSize(b);
+          sizeOf(a) - sizeOf(b);
 
         if (sizeDiff !== 0) {
           return sizeDiff;
         }
 
-        const aHevc =
-          /hevc|x265/i.test(a.name);
+        const hevcDiff =
+          Number(isHEVC(b)) -
+          Number(isHEVC(a));
 
-        const bHevc =
-          /hevc|x265/i.test(b.name);
-
-        if (aHevc !== bHevc) {
-          return bHevc ? 1 : -1;
+        if (hevcDiff !== 0) {
+          return hevcDiff;
         }
 
         return 0;
@@ -495,60 +496,106 @@ function selectBestTorrent(torrents) {
   }
 
   /*
-   * --------------------------------------------------
-   * No 1080p or 720p
-   * --------------------------------------------------
+   * ==================================================
+   * 3. NO 720p
    *
-   * Choose the HIGHEST available resolution.
+   * USE 1080p EVEN IF > 3.5 GB
+   * ==================================================
    *
    * Example:
    *
-   * 4K 7GB
-   * 480p 720MB
+   * 1080p 4 GB
+   * 480p 720 MB
    *
-   * -> 4K 7GB
+   * -> 1080p 4 GB
    */
 
-  const resolutions = pool
-    .map(t =>
-      getResolutionValue(t.name)
-    )
-    .filter(r => r > 0);
+  const all1080 = pool.filter(is1080);
 
-  if (resolutions.length > 0) {
+  if (all1080.length > 0) {
+
+    return [...all1080].sort(
+      (a, b) => {
+
+        /*
+         * Choose the smallest 1080p.
+         */
+        const sizeDiff =
+          sizeOf(a) - sizeOf(b);
+
+        if (sizeDiff !== 0) {
+          return sizeDiff;
+        }
+
+        const hevcDiff =
+          Number(isHEVC(b)) -
+          Number(isHEVC(a));
+
+        if (hevcDiff !== 0) {
+          return hevcDiff;
+        }
+
+        return 0;
+      }
+    )[0];
+  }
+
+  /*
+   * ==================================================
+   * 4. NO 1080p OR 720p
+   *
+   * CHOOSE HIGHEST AVAILABLE RESOLUTION
+   * ==================================================
+   *
+   * Example:
+   *
+   * 4K 7 GB
+   * 480p 720 MB
+   *
+   * -> 4K 7 GB
+   */
+
+  const resolutionTorrents =
+    pool.filter(t =>
+      resolutionOf(t) > 0
+    );
+
+  if (resolutionTorrents.length > 0) {
 
     const highestResolution =
-      Math.max(...resolutions);
+      Math.max(
+        ...resolutionTorrents.map(
+          resolutionOf
+        )
+      );
 
     const highestResolutionTorrents =
-      pool.filter(t =>
-        getResolutionValue(t.name) ===
+      resolutionTorrents.filter(t =>
+        resolutionOf(t) ===
         highestResolution
       );
 
     /*
-     * Same highest resolution:
-     * choose smallest file.
+     * If multiple files have the same highest
+     * resolution, choose the smallest actual size.
      */
+
     return [...highestResolutionTorrents].sort(
       (a, b) => {
 
         const sizeDiff =
-          getTorrentSize(a) -
-          getTorrentSize(b);
+          sizeOf(a) - sizeOf(b);
 
         if (sizeDiff !== 0) {
           return sizeDiff;
         }
 
-        const aHevc =
-          /hevc|x265/i.test(a.name);
+        const hevcDiff =
+          Number(isHEVC(b)) -
+          Number(isHEVC(a));
 
-        const bHevc =
-          /hevc|x265/i.test(b.name);
-
-        if (aHevc !== bHevc) {
-          return bHevc ? 1 : -1;
+        if (hevcDiff !== 0) {
+          return hevcDiff;
         }
 
         return 0;
@@ -557,9 +604,17 @@ function selectBestTorrent(torrents) {
   }
 
   /*
-   * No recognizable resolution.
+   * ==================================================
+   * 5. NO RECOGNIZABLE RESOLUTION
+   *
+   * Choose the smallest actual qBittorrent torrent.
+   * ==================================================
    */
-  return sortByLanguageAndSize(pool)[0];
+
+  return [...pool].sort(
+    (a, b) =>
+      sizeOf(a) - sizeOf(b)
+  )[0];
 }
 
 /* --------------------------------------------------
@@ -615,7 +670,7 @@ export async function deleteTorrents(hashes) {
 }
 
 export async function cleanupTodayTorrents() {
-  const tag = "script";
+  const tag = "test";
 
   await publishMessage({
     message:
@@ -702,6 +757,18 @@ export async function cleanupTodayTorrents() {
       });
     }
 
+    if (!best) {
+  console.log(
+    `Skipping ${movie}:🤬 no torrent has completed metadata yet.`
+  );
+
+  await publishMessage({
+    message:
+      `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
+  });
+
+  continue;
+}
     console.log(
       `Keeping: ${best.name}`
     );
