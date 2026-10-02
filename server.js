@@ -1,5 +1,5 @@
 import { delay } from "./delay.js";
-import { cleanupTodayTorrents, moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
+import { cleanupTodayTorrents } from "./qbittorrent/torrentCleanUp.js";
 import { loginQB } from "./qbittorrent/qb.js";
 import {
   triggerHomeAssistantWebhook,
@@ -9,6 +9,7 @@ import { log } from "./timelog.js";
 import { publishMessage } from "./queue/publishMessage.js";
 import { retry } from "./homeassitant/RetryWrapper.js";
 import { selectPredvd } from "./qbittorrent/predvd.js";
+import { moveTodayShowsToTV } from "./qbittorrent/moveTodayShowsToTV.js";
 
 async function main() {
   try {
