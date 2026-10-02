@@ -22,27 +22,14 @@ function isPreDVD(name) {
   return /\bpredvd\b/i.test(name);
 }
 
-function parseSizeFromName(name) {
-  const match = name.match(
-    /\b(\d+(?:\.\d+)?)\s*(GB|GIB|MB|MIB)\b/i
-  );
+function getTorrentSize(torrent) {
+  const size = Number(torrent.size);
 
-  if (!match) return null;
-
-  const value = Number(match[1]);
-  const unit = match[2].toLowerCase();
-
-  if (!Number.isFinite(value)) return null;
-
-  if (unit === "gb" || unit === "gib") {
-    return value * 1024 * 1024 * 1024;
+  if (Number.isFinite(size) && size > 0) {
+    return size;
   }
 
-  return value * 1024 * 1024;
-}
-
-function getTorrentSize(torrent) {
-  return parseSizeFromName(torrent.name) ?? torrent.size ?? 0;
+  return 0;
 }
 
 function hasFullMalayalam(name) {
