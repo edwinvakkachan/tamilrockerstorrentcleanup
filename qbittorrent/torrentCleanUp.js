@@ -2,6 +2,11 @@ import { qb } from "./qb.js";
 import { publishMessage } from "../queue/publishMessage.js";
 import { delay } from "../delay.js";
 import { queueRadarrCleanup } from "../radarrCleanupQueue.js";
+import {
+  analyzeResolutions,
+  getAnalyzedResolution
+} from "../resolutionAnalyzer.js";
+
 const TWO_GB = 2 * 1024 * 1024 * 1024;
 const THREE_GB = 3 * 1024 * 1024 * 1024;
 const FIVE_GB = 5 * 1024 * 1024 * 1024;
@@ -75,6 +80,7 @@ function sortTVTorrents(list) {
   return [...list]
     .filter(t => getTorrentSize(t) < FIVE_GB)
     .sort((a, b) => {
+
       // Avoid PreDVD
       const aPre = isPreDVD(a.name);
       const bPre = isPreDVD(b.name);
@@ -124,14 +130,22 @@ function sortTVTorrents(list) {
    Movie Helpers
 -------------------------------------------------- */
 
-function getResolutionValue(name) {
-  const match = name.match(
-    /\b(2160p|1440p|1080p|720p|576p|480p|360p)\b/i
-  );
-
-  if (!match) return 0;
-
-  return Number(match[1].replace("p", ""));
+/*
+ * IMPORTANT:
+ *
+ * Resolution is now taken from resolutionAnalyzer.js.
+ *
+ * This means:
+ *
+ * 1. If filename contains 1080p/720p/etc,
+ *    that value is used.
+ *
+ * 2. If filename has no resolution,
+ *    the analyzer may infer one using the
+ *    other torrents from the same movie group.
+ */
+function getResolutionValue(torrent) {
+  return getAnalyzedResolution(torrent);
 }
 
 /*
@@ -149,6 +163,7 @@ function getResolutionValue(name) {
  */
 function sortByLanguageAndSize(list) {
   return [...list].sort((a, b) => {
+
     // Avoid PreDVD
     const aPre = isPreDVD(a.name);
     const bPre = isPreDVD(b.name);
@@ -166,36 +181,52 @@ function sortByLanguageAndSize(list) {
       return langDiff;
     }
 
-    // Prefer 1080p
-    const aResolution = getResolutionValue(a.name);
-    const bResolution = getResolutionValue(b.name);
+    // Prefer resolution
+    const aResolution =
+      getResolutionValue(a);
+
+    const bResolution =
+      getResolutionValue(b);
 
     if (aResolution !== bResolution) {
-      if (aResolution === 1080) return -1;
-      if (bResolution === 1080) return 1;
+
+      if (aResolution === 1080) {
+        return -1;
+      }
+
+      if (bResolution === 1080) {
+        return 1;
+      }
 
       return bResolution - aResolution;
     }
 
     // Prefer smallest file
     const sizeDiff =
-      getTorrentSize(a) - getTorrentSize(b);
+      getTorrentSize(a) -
+      getTorrentSize(b);
 
     if (sizeDiff !== 0) {
       return sizeDiff;
     }
 
-    // Prefer HEVC/x265 when size is equal
-    const aHevc = /hevc|x265/i.test(a.name);
-    const bHevc = /hevc|x265/i.test(b.name);
+    // Prefer HEVC/x265
+    const aHevc =
+      /hevc|x265/i.test(a.name);
+
+    const bHevc =
+      /hevc|x265/i.test(b.name);
 
     if (aHevc !== bHevc) {
       return bHevc ? 1 : -1;
     }
 
     // Prefer WEB-DL
-    const aWeb = /web[- ]dl/i.test(a.name);
-    const bWeb = /web[- ]dl/i.test(b.name);
+    const aWeb =
+      /web[- ]dl/i.test(a.name);
+
+    const bWeb =
+      /web[- ]dl/i.test(b.name);
 
     if (aWeb !== bWeb) {
       return bWeb ? 1 : -1;
@@ -210,39 +241,79 @@ function sortByLanguageAndSize(list) {
 -------------------------------------------------- */
 
 function selectBestTorrent(torrents) {
-  if (!torrents || !torrents.length) {
+
+  if (
+    !torrents ||
+    !torrents.length
+  ) {
     return null;
   }
+
+  /*
+   * ==================================================
+   * ABSOLUTE PRE-DVD RULE
+   * ==================================================
+   *
+   * If ANY non-PreDVD torrent exists in the original
+   * analyzed group, PreDVD torrents are NEVER allowed
+   * to be selected.
+   *
+   * This check happens BEFORE metadataReady filtering.
+   */
+
+  const hasNonPreDVD =
+    torrents.some(
+      t =>
+        typeof t.name === "string" &&
+        t.name.trim() !== "" &&
+        !isPreDVD(t.name)
+    );
+
+  /*
+   * If normal torrents exist:
+   *
+   * ONLY non-PreDVD torrents are allowed.
+   *
+   * If there are no normal torrents:
+   *
+   * PreDVD is allowed.
+   */
+
+  const selectionSource =
+    hasNonPreDVD
+      ? torrents.filter(
+          t => !isPreDVD(t.name)
+        )
+      : torrents;
 
   /*
    * ==================================================
    * ONLY USE TORRENTS WITH VALID QBITTORRENT METADATA
    * ==================================================
    *
-   * Size is taken ONLY from:
-   *
-   *     torrent.size
-   *
-   * We do NOT read size from the torrent title.
-   *
-   * If metadata has not downloaded yet, qBittorrent
-   * can report size = 0. Such torrents are ignored.
+   * Size is taken ONLY from torrent.size.
    */
 
-  const metadataReady = torrents.filter(t => {
-    const size = Number(t.size);
+  const metadataReady =
+    selectionSource.filter(t => {
 
-    return (
-      Number.isFinite(size) &&
-      size > 0 &&
-      typeof t.name === "string" &&
-      t.name.trim() !== ""
-    );
-  });
+      const size =
+        Number(t.size);
+
+      return (
+        Number.isFinite(size) &&
+        size > 0 &&
+        typeof t.name === "string" &&
+        t.name.trim() !== ""
+      );
+    });
 
   if (!metadataReady.length) {
+
     console.log(
-      "No torrents have valid qBittorrent metadata yet."
+      hasNonPreDVD
+        ? "No non-PreDVD torrents have valid qBittorrent metadata yet."
+        : "No torrents have valid qBittorrent metadata yet."
     );
 
     return null;
@@ -254,12 +325,17 @@ function selectBestTorrent(torrents) {
    * ==================================================
    */
 
-  const tvTorrents = metadataReady.filter(t =>
-    isTVShow(t.name)
-  );
+  const tvTorrents =
+    metadataReady.filter(
+      t => isTVShow(t.name)
+    );
 
   if (tvTorrents.length > 0) {
-    const sortedTV = sortTVTorrents(tvTorrents);
+
+    const sortedTV =
+      sortTVTorrents(
+        tvTorrents
+      );
 
     if (sortedTV.length > 0) {
       return sortedTV[0];
@@ -268,35 +344,19 @@ function selectBestTorrent(torrents) {
 
   /*
    * ==================================================
-   * REMOVE PRE-DVD
-   * ==================================================
-   *
-   * If normal releases exist, don't select PreDVD.
-   */
-
-  const nonPreDVD = metadataReady.filter(
-    t => !isPreDVD(t.name)
-  );
-
-  const candidates =
-    nonPreDVD.length > 0
-      ? nonPreDVD
-      : metadataReady;
-
-  /*
-   * ==================================================
    * MALAYALAM PREFERENCE
    * ==================================================
    */
 
-  const malayalamTorrents = candidates.filter(t =>
-    isMalayalam(t.name)
-  );
+  const malayalamTorrents =
+    metadataReady.filter(
+      t => isMalayalam(t.name)
+    );
 
   const pool =
     malayalamTorrents.length > 0
       ? malayalamTorrents
-      : candidates;
+      : metadataReady;
 
   /*
    * ==================================================
@@ -304,20 +364,49 @@ function selectBestTorrent(torrents) {
    * ==================================================
    */
 
-  const sizeOf = torrent =>
-    Number(torrent.size);
+  const sizeOf =
+    torrent =>
+      Number(torrent.size);
 
-  const resolutionOf = torrent =>
-    getResolutionValue(torrent.name);
+  const resolutionOf =
+    torrent =>
+      getAnalyzedResolution(torrent);
 
-  const is1080 = torrent =>
-    resolutionOf(torrent) === 1080;
+  const is1080 =
+    torrent =>
+      resolutionOf(torrent) === 1080;
 
-  const is720 = torrent =>
-    resolutionOf(torrent) === 720;
+  const is720 =
+    torrent =>
+      resolutionOf(torrent) === 720;
 
-  const isHEVC = torrent =>
-    /hevc|x265/i.test(torrent.name);
+  const isHEVC =
+    torrent =>
+      /hevc|x265/i.test(
+        torrent.name
+      );
+
+  /*
+   * ==================================================
+   * DEBUG
+   * ==================================================
+   */
+
+  console.log(
+    "\n🔎 RESOLUTION DEBUG:"
+  );
+
+  for (const t of pool) {
+
+    console.log(
+      `${t.name} | ` +
+      `size=${sizeOf(t)} | ` +
+      `resolution=${resolutionOf(t)} | ` +
+      `source=${t.resolutionSource || "filename"} | ` +
+      `is1080=${is1080(t)} | ` +
+      `is720=${is720(t)}`
+    );
+  }
 
   /*
    * ==================================================
@@ -326,35 +415,48 @@ function selectBestTorrent(torrents) {
    *
    * If multiple suitable 1080p files exist:
    *
-   *     choose the SMALLEST actual torrent size.
-   *
-   * Example:
-   *
-   * 1080p 1.8 GB
-   * 1080p 2.4 GB
-   * 1080p 3.2 GB
-   *
-   * -> 1.8 GB
+   * Choose the SMALLEST actual torrent size.
    */
 
   const MAX_1080_SIZE =
-    3.5 * 1024 * 1024 * 1024;
+    3.5 *
+    1024 *
+    1024 *
+    1024;
 
-  const suitable1080 = pool.filter(t =>
-    is1080(t) &&
-    sizeOf(t) <= MAX_1080_SIZE
+  const suitable1080 =
+    pool.filter(t =>
+      is1080(t) &&
+      sizeOf(t) <=
+        MAX_1080_SIZE
+    );
+
+  console.log(
+    "\n🎯 1080p candidates:"
   );
 
-  if (suitable1080.length > 0) {
+  for (
+    const t of suitable1080
+  ) {
 
-    return [...suitable1080].sort(
-      (a, b) => {
+    console.log(
+      `${t.name} | size=${sizeOf(t)}`
+    );
+  }
+
+  if (
+    suitable1080.length > 0
+  ) {
+
+    return [...suitable1080]
+      .sort((a, b) => {
 
         /*
-         * Smallest actual qBittorrent size.
+         * Smallest actual size.
          */
         const sizeDiff =
-          sizeOf(a) - sizeOf(b);
+          sizeOf(a) -
+          sizeOf(b);
 
         if (sizeDiff !== 0) {
           return sizeDiff;
@@ -377,14 +479,20 @@ function selectBestTorrent(torrents) {
          * Prefer WEB-DL.
          */
         const aWeb =
-          /web[- ]dl/i.test(a.name);
+          /web[- ]dl/i.test(
+            a.name
+          );
 
         const bWeb =
-          /web[- ]dl/i.test(b.name);
+          /web[- ]dl/i.test(
+            b.name
+          );
 
-        return Number(bWeb) - Number(aWeb);
-      }
-    )[0];
+        return (
+          Number(bWeb) -
+          Number(aWeb)
+        );
+      })[0];
   }
 
   /*
@@ -395,43 +503,45 @@ function selectBestTorrent(torrents) {
    * ==================================================
    */
 
-  const torrents720 = pool.filter(is720);
+  const torrents720 =
+    pool.filter(is720);
 
-  if (torrents720.length > 0) {
+  if (
+    torrents720.length > 0
+  ) {
 
     const MAX_720_SIZE =
-      2 * 1024 * 1024 * 1024;
+      2 *
+      1024 *
+      1024 *
+      1024;
 
     /*
-     * --------------------------------------------------
      * 720p <= 2 GB
-     * --------------------------------------------------
      *
      * Choose the LARGEST file up to 2 GB.
-     *
-     * Example:
-     *
-     * 720p 700 MB
-     * 720p 1.5 GB
-     * 720p 2.0 GB
-     *
-     * -> 2.0 GB
      */
 
-    const suitable720 = torrents720.filter(t =>
-      sizeOf(t) <= MAX_720_SIZE
-    );
+    const suitable720 =
+      torrents720.filter(
+        t =>
+          sizeOf(t) <=
+          MAX_720_SIZE
+      );
 
-    if (suitable720.length > 0) {
+    if (
+      suitable720.length > 0
+    ) {
 
-      return [...suitable720].sort(
-        (a, b) => {
+      return [...suitable720]
+        .sort((a, b) => {
 
           /*
            * Largest file first.
            */
           const sizeDiff =
-            sizeOf(b) - sizeOf(a);
+            sizeOf(b) -
+            sizeOf(a);
 
           if (sizeDiff !== 0) {
             return sizeDiff;
@@ -454,29 +564,34 @@ function selectBestTorrent(torrents) {
            * Prefer WEB-DL.
            */
           const aWeb =
-            /web[- ]dl/i.test(a.name);
+            /web[- ]dl/i.test(
+              a.name
+            );
 
           const bWeb =
-            /web[- ]dl/i.test(b.name);
+            /web[- ]dl/i.test(
+              b.name
+            );
 
-          return Number(bWeb) - Number(aWeb);
-        }
-      )[0];
+          return (
+            Number(bWeb) -
+            Number(aWeb)
+          );
+        })[0];
     }
 
     /*
-     * --------------------------------------------------
      * 720p EXISTS BUT ALL ARE > 2 GB
-     * --------------------------------------------------
      *
      * Choose the smallest 720p.
      */
 
-    return [...torrents720].sort(
-      (a, b) => {
+    return [...torrents720]
+      .sort((a, b) => {
 
         const sizeDiff =
-          sizeOf(a) - sizeOf(b);
+          sizeOf(a) -
+          sizeOf(b);
 
         if (sizeDiff !== 0) {
           return sizeDiff;
@@ -491,8 +606,7 @@ function selectBestTorrent(torrents) {
         }
 
         return 0;
-      }
-    )[0];
+      })[0];
   }
 
   /*
@@ -501,27 +615,24 @@ function selectBestTorrent(torrents) {
    *
    * USE 1080p EVEN IF > 3.5 GB
    * ==================================================
-   *
-   * Example:
-   *
-   * 1080p 4 GB
-   * 480p 720 MB
-   *
-   * -> 1080p 4 GB
    */
 
-  const all1080 = pool.filter(is1080);
+  const all1080 =
+    pool.filter(is1080);
 
-  if (all1080.length > 0) {
+  if (
+    all1080.length > 0
+  ) {
 
-    return [...all1080].sort(
-      (a, b) => {
+    return [...all1080]
+      .sort((a, b) => {
 
         /*
-         * Choose the smallest 1080p.
+         * Choose smallest 1080p.
          */
         const sizeDiff =
-          sizeOf(a) - sizeOf(b);
+          sizeOf(a) -
+          sizeOf(b);
 
         if (sizeDiff !== 0) {
           return sizeDiff;
@@ -536,8 +647,7 @@ function selectBestTorrent(torrents) {
         }
 
         return 0;
-      }
-    )[0];
+      })[0];
   }
 
   /*
@@ -546,21 +656,17 @@ function selectBestTorrent(torrents) {
    *
    * CHOOSE HIGHEST AVAILABLE RESOLUTION
    * ==================================================
-   *
-   * Example:
-   *
-   * 4K 7 GB
-   * 480p 720 MB
-   *
-   * -> 4K 7 GB
    */
 
   const resolutionTorrents =
-    pool.filter(t =>
-      resolutionOf(t) > 0
+    pool.filter(
+      t =>
+        resolutionOf(t) > 0
     );
 
-  if (resolutionTorrents.length > 0) {
+  if (
+    resolutionTorrents.length > 0
+  ) {
 
     const highestResolution =
       Math.max(
@@ -570,51 +676,70 @@ function selectBestTorrent(torrents) {
       );
 
     const highestResolutionTorrents =
-      resolutionTorrents.filter(t =>
-        resolutionOf(t) ===
-        highestResolution
+      resolutionTorrents.filter(
+        t =>
+          resolutionOf(t) ===
+          highestResolution
       );
 
     /*
-     * If multiple files have the same highest
-     * resolution, choose the smallest actual size.
+     * Same resolution:
+     * choose smallest actual size.
      */
 
-    return [...highestResolutionTorrents].sort(
-      (a, b) => {
+    return [
+      ...highestResolutionTorrents
+    ].sort((a, b) => {
 
-        const sizeDiff =
-          sizeOf(a) - sizeOf(b);
+      const sizeDiff =
+        sizeOf(a) -
+        sizeOf(b);
 
-        if (sizeDiff !== 0) {
-          return sizeDiff;
-        }
-
-        const hevcDiff =
-          Number(isHEVC(b)) -
-          Number(isHEVC(a));
-
-        if (hevcDiff !== 0) {
-          return hevcDiff;
-        }
-
-        return 0;
+      if (sizeDiff !== 0) {
+        return sizeDiff;
       }
-    )[0];
+
+      const hevcDiff =
+        Number(isHEVC(b)) -
+        Number(isHEVC(a));
+
+      if (hevcDiff !== 0) {
+        return hevcDiff;
+      }
+
+      return 0;
+    })[0];
   }
 
   /*
    * ==================================================
    * 5. NO RECOGNIZABLE RESOLUTION
-   *
-   * Choose the smallest actual qBittorrent torrent.
    * ==================================================
+   *
+   * IMPORTANT:
+   *
+   * Do NOT blindly select the smallest file anymore.
+   *
+   * If every candidate has an unknown resolution,
+   * use the existing language/size sorter rather than
+   * allowing an unknown 300MB file to automatically win.
+   *
+   * This keeps the decision deterministic while avoiding
+   * the old resolution=0 -> smallest-file behavior.
    */
 
-  return [...pool].sort(
-    (a, b) =>
-      sizeOf(a) - sizeOf(b)
-  )[0];
+  const sortedUnknown =
+    sortByLanguageAndSize(
+      pool
+    );
+
+  if (
+    sortedUnknown.length > 0
+  ) {
+    return sortedUnknown[0];
+  }
+
+  return null;
 }
 
 /* --------------------------------------------------
@@ -622,11 +747,14 @@ function selectBestTorrent(torrents) {
 -------------------------------------------------- */
 
 function extractMovieKey(name) {
-  const match = name.match(
-    /-\s*(.+?\(\d{4}\))/
-  );
+
+  const match =
+    name.match(
+      /-\s*(.+?\(\d{4}\))/
+    );
 
   if (match) {
+
     return match[1]
       .trim()
       .toLowerCase();
@@ -637,25 +765,38 @@ function extractMovieKey(name) {
       /\b(2160p|1080p|720p|480p|x265|x264|HEVC|HDRip|WEB-DL|AAC|DD5\.1)\b/gi,
       ""
     )
-    .replace(/\s+/g, " ")
+    .replace(
+      /\s+/g,
+      " "
+    )
     .trim()
     .toLowerCase();
 }
 
 export async function getTorrentsByTag(tag) {
-  const { data } = await qb.get(
-    "/api/v2/torrents/info",
-    {
-      params: { tag }
-    }
-  );
 
-  await delay(3000, true);
+  const { data } =
+    await qb.get(
+      "/api/v2/torrents/info",
+      {
+        params: {
+          tag
+        }
+      }
+    );
+
+  await delay(
+    3000,
+    true
+  );
 
   return data;
 }
 
-export async function deleteTorrents(hashes) {
+export async function deleteTorrents(
+  hashes
+) {
+
   if (!hashes.length) {
     return;
   }
@@ -663,13 +804,17 @@ export async function deleteTorrents(hashes) {
   await qb.post(
     "/api/v2/torrents/delete",
     new URLSearchParams({
-      hashes: hashes.join("|"),
-      deleteFiles: "true"
+      hashes:
+        hashes.join("|"),
+
+      deleteFiles:
+        "true"
     })
   );
 }
 
 export async function cleanupTodayTorrents() {
+
   const tag = "script";
 
   await publishMessage({
@@ -682,11 +827,18 @@ export async function cleanupTodayTorrents() {
   );
 
   const torrents =
-    await getTorrentsByTag(tag);
+    await getTorrentsByTag(
+      tag
+    );
 
-  await delay(2000, true);
+  await delay(
+    2000,
+    true
+  );
 
-  if (!torrents.length) {
+  if (
+    !torrents.length
+  ) {
 
     console.log(
       "No torrents found for today cleanup"
@@ -700,40 +852,100 @@ export async function cleanupTodayTorrents() {
     return;
   }
 
+  /*
+   * ==================================================
+   * GROUP TORRENTS BY MOVIE
+   * ==================================================
+   */
+
   const grouped = {};
 
-  for (const torrent of torrents) {
+  for (
+    const torrent
+    of torrents
+  ) {
 
     const key =
-      extractMovieKey(torrent.name);
+      extractMovieKey(
+        torrent.name
+      );
 
     if (!grouped[key]) {
       grouped[key] = [];
     }
 
-    grouped[key].push(torrent);
+    grouped[key].push(
+      torrent
+    );
   }
 
   const hashesToDelete = [];
 
-  for (const movie in grouped) {
+  /*
+   * ==================================================
+   * PROCESS EACH MOVIE
+   * ==================================================
+   */
 
-    const group = grouped[movie];
+  for (
+    const movie
+    in grouped
+  ) {
 
-    if (group.length === 1) {
+    const group =
+      grouped[movie];
+
+    if (
+      group.length === 1
+    ) {
       continue;
     }
 
+    /*
+     * ==================================================
+     * IMPORTANT:
+     *
+     * Resolution analysis MUST happen on the COMPLETE
+     * original group.
+     *
+     * Do NOT pass:
+     *
+     * metadataReady
+     * nonPreDVD
+     * pool
+     *
+     * to analyzeResolutions().
+     *
+     * The analyzer needs ALL candidates so it can learn
+     * the size/resolution relationship.
+     * ==================================================
+     */
+
+    const analyzedGroup =
+      analyzeResolutions(
+        group
+      );
+
+    /*
+     * Select the best torrent using the analyzed
+     * resolution information.
+     */
+
     const best =
-      selectBestTorrent(group);
+      selectBestTorrent(
+        analyzedGroup
+      );
 
     const separator =
       "========================================";
 
-    console.log(separator);
+    console.log(
+      separator
+    );
 
     await publishMessage({
-      message: separator
+      message:
+        separator
     });
 
     console.log(
@@ -745,7 +957,14 @@ export async function cleanupTodayTorrents() {
         `Checking duplicates for: ${movie}`
     });
 
-    for (const torrent of group) {
+    /*
+     * Show ORIGINAL torrent candidates.
+     */
+
+    for (
+      const torrent
+      of group
+    ) {
 
       console.log(
         `Candidate: ${torrent.name}`
@@ -757,18 +976,28 @@ export async function cleanupTodayTorrents() {
       });
     }
 
+    /*
+     * No valid torrent.
+     */
+
     if (!best) {
-  console.log(
-    `Skipping ${movie}:🤬 no torrent has completed metadata yet.`
-  );
 
-  await publishMessage({
-    message:
-      `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
-  });
+      console.log(
+        `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
+      );
 
-  continue;
-}
+      await publishMessage({
+        message:
+          `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
+      });
+
+      continue;
+    }
+
+    /*
+     * Show selected torrent.
+     */
+
     console.log(
       `Keeping: ${best.name}`
     );
@@ -778,35 +1007,72 @@ export async function cleanupTodayTorrents() {
         `Keeping: ${best.name}`
     });
 
-const torrentsToDelete = group.filter(
-  t => t.hash !== best.hash
-);
+    /*
+     * ==================================================
+     * DELETE ALL OTHER TORRENTS
+     * ==================================================
+     */
 
-for (const torrent of torrentsToDelete) {
+    const torrentsToDelete =
+      group.filter(
+        t =>
+          t.hash !==
+          best.hash
+      );
+
+    for (
+      const torrent
+      of torrentsToDelete
+    ) {
+
+      /*
+       * If this is a PreDVD torrent carrying the
+       * predvd tag, add the movie to Radarr cleanup queue.
+       */
+
+      if (
+        isPreDVD(
+          torrent.name
+        ) &&
+        String(
+          torrent.tags || ""
+        )
+          .split(",")
+          .map(
+            tag =>
+              tag
+                .trim()
+                .toLowerCase()
+          )
+          .includes(
+            "predvd"
+          )
+      ) {
+
+        await queueRadarrCleanup(
+          torrent
+        );
+      }
+
+      hashesToDelete.push(
+        torrent.hash
+      );
+    }
+  }
 
   /*
-   * If this is a PreDVD torrent carrying the
-   * predvdtag, add the movie to Radarr cleanup queue.
+   * ==================================================
+   * DELETE DUPLICATES
+   * ==================================================
    */
+
   if (
-    isPreDVD(torrent.name) &&
-    String(torrent.tags || "")
-      .split(",")
-      .map(tag => tag.trim().toLowerCase())
-      .includes("predvd")
+    hashesToDelete.length
   ) {
-    await queueRadarrCleanup(torrent);
-  }
 
-  hashesToDelete.push(torrent.hash);
-}
-  }
-
-  if (hashesToDelete.length) {
-
-    await deleteTorrents(
-      hashesToDelete
-    );
+    // await deleteTorrents(
+    //   hashesToDelete
+    // );
 
     console.log(
       "Duplicate torrents deleted"
