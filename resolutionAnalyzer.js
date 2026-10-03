@@ -1,56 +1,59 @@
 
-// resolutionAnalyzer.js
-
 /*
- * ============================================================
- * RESOLUTION ANALYZER
- * ============================================================
+ * resolutionAnalyzer.js
  *
- * Purpose:
+ * Deterministic resolution analyzer.
  *
- * 1. Read resolution directly from torrent filename when present.
+ * IMPORTANT:
+ * Resolution explicitly present in the filename ALWAYS wins.
  *
- * 2. For torrents without a resolution in the filename,
- *    analyze OTHER torrents from the SAME movie group.
+ * If resolution is missing from the filename, use fixed file-size
+ * thresholds. Do NOT build thresholds from other torrents.
  *
- * 3. Build a size profile such as:
- *
- *      720p  -> 1.1GB - 1.7GB
- *      1080p -> 2.0GB - 3.3GB
- *
- * 4. Use those profiles to infer resolution only when there
- *    is enough evidence.
- *
- * 5. DO NOT automatically classify a small file as 720p just
- *    because it is smaller than a known 1080p file.
- *
- * Example:
- *
- *      1080p -> 2GB, 3.3GB
- *      720p  -> 1.1GB, 1.7GB
- *
- *      800MB -> unknown
- *      500MB -> unknown
- *      300MB -> unknown
- *
- * This is intentional.
- *
- * ============================================================
+ * This prevents the same torrent from being classified differently
+ * depending on which other torrents happen to be available.
  */
-
-const KNOWN_RESOLUTIONS = [
-  2160,
-  1440,
-  1080,
-  720,
-  576,
-  480,
-  360
-];
 
 
 /* ============================================================
-   Extract resolution directly from filename
+   FIXED SIZE THRESHOLDS
+   ============================================================ */
+
+/*
+ * These are intentionally FIXED.
+ *
+ * They are only fallback classifications.
+ * They do NOT claim that file size can determine the real
+ * encoded resolution with certainty.
+ *
+ * Explicit filename resolution always has priority.
+ *
+ * Approximate:
+ *
+ * < 450 MB       -> 360p
+ * 450 MB-700 MB  -> 480p
+ * 700 MB-1.5 GB  -> 720p
+ * >= 1.5 GB      -> 1080p
+ *
+ * These values can be adjusted later if your torrent collection
+ * shows a different pattern.
+ */
+
+const MB = 1024 * 1024;
+const GB = 1024 * MB;
+
+const SIZE_THRESHOLD_360 =
+  450 * MB;
+
+const SIZE_THRESHOLD_480 =
+  700 * MB;
+
+const SIZE_THRESHOLD_720 =
+  1.5 * GB;
+
+
+/* ============================================================
+   EXTRACT EXPLICIT RESOLUTION
    ============================================================ */
 
 export function extractResolution(name) {
@@ -62,29 +65,45 @@ export function extractResolution(name) {
     return 0;
   }
 
-  const match = name.match(
-    /\b(2160p|1440p|1080p|720p|576p|480p|360p)\b/i
-  );
+  /*
+   * Match common resolution formats:
+   *
+   * 2160p
+   * 1440p
+   * 1080p
+   * 720p
+   * 576p
+   * 480p
+   * 360p
+   */
+
+  const match =
+    name.match(
+      /\b(2160|1440|1080|720|576|480|360)p\b/i
+    );
 
   if (!match) {
     return 0;
   }
 
   return Number(
-    match[1].replace(/p$/i, "")
+    match[1]
   );
 }
 
 
 /* ============================================================
-   Get qBittorrent actual file size
+   GET TORRENT SIZE
    ============================================================ */
 
-function getSize(torrent) {
+function getTorrentSize(
+  torrent
+) {
 
-  const size = Number(
-    torrent?.size
-  );
+  const size =
+    Number(
+      torrent?.size
+    );
 
   if (
     !Number.isFinite(size) ||
@@ -98,366 +117,180 @@ function getSize(torrent) {
 
 
 /* ============================================================
-   Median
-   ============================================================ */
-
-function median(values) {
-
-  if (!values.length) {
-    return 0;
-  }
-
-  const sorted = [...values].sort(
-    (a, b) => a - b
-  );
-
-  const middle =
-    Math.floor(sorted.length / 2);
-
-  if (
-    sorted.length % 2 === 0
-  ) {
-
-    return (
-      sorted[middle - 1] +
-      sorted[middle]
-    ) / 2;
-  }
-
-  return sorted[middle];
-}
-
-
-/* ============================================================
-   Build resolution profile
+   FIXED SIZE-BASED FALLBACK
    ============================================================
  *
- * ONLY torrents with an explicitly known resolution are used
- * to construct the profile.
+ * IMPORTANT:
  *
- * Unknown torrents are NEVER used as references.
+ * This function does NOT inspect any other torrent.
+ *
+ * Therefore:
+ *
+ * 300 MB will ALWAYS produce the same result.
+ * 500 MB will ALWAYS produce the same result.
+ * 800 MB will ALWAYS produce the same result.
+ *
+ * A new 1080p torrent appearing later cannot change them.
  *
  * ============================================================
  */
 
-function buildResolutionProfile(torrents) {
+export function inferResolutionFromSize(
+  size
+) {
 
-  const profile = {};
+  if (
+    !Number.isFinite(size) ||
+    size <= 0
+  ) {
+    return 0;
+  }
 
-  for (
-    const resolution
-    of KNOWN_RESOLUTIONS
+
+  /*
+   * Less than 450 MB
+   */
+
+  if (
+    size < SIZE_THRESHOLD_360
   ) {
 
-    const sizes = torrents
-      .filter(t =>
-        extractResolution(
-          t?.name
-        ) === resolution
-      )
-      .map(getSize)
-      .filter(size =>
-        size > 0
-      );
+    return 360;
+  }
 
-    if (!sizes.length) {
-      continue;
-    }
 
-    profile[resolution] = {
+  /*
+   * 450 MB - 700 MB
+   */
 
-      min:
-        Math.min(...sizes),
+  if (
+    size < SIZE_THRESHOLD_480
+  ) {
 
-      max:
-        Math.max(...sizes),
+    return 480;
+  }
 
-      median:
-        median(sizes),
 
-      count:
-        sizes.length,
+  /*
+   * 700 MB - 1.5 GB
+   */
 
-      sizes
+  if (
+    size < SIZE_THRESHOLD_720
+  ) {
+
+    return 720;
+  }
+
+
+  /*
+   * 1.5 GB and above
+   */
+
+  return 1080;
+}
+
+
+/* ============================================================
+   ANALYZE ONE TORRENT
+   ============================================================ */
+
+export function analyzeTorrent(
+  torrent
+) {
+
+  if (!torrent) {
+    return torrent;
+  }
+
+
+  /*
+   * ------------------------------------------------------------
+   * STEP 1
+   *
+   * Explicit resolution from filename.
+   * ------------------------------------------------------------
+   */
+
+  const explicitResolution =
+    extractResolution(
+      torrent.name
+    );
+
+
+  if (
+    explicitResolution > 0
+  ) {
+
+    return {
+      ...torrent,
+
+      inferredResolution:
+        explicitResolution,
+
+      resolutionSource:
+        "filename"
     };
   }
 
-  return profile;
-}
 
-
-/* ============================================================
-   Print profile
-   ============================================================ */
-
-function printResolutionProfile(profile) {
-
-  console.log(
-    "\n📊 Resolution size profile:"
-  );
-
-  const resolutions =
-    Object.keys(profile)
-      .map(Number)
-      .sort((a, b) => a - b);
-
-  if (!resolutions.length) {
-
-    console.log(
-      "No known resolution torrents available for analysis."
-    );
-
-    return;
-  }
-
-  for (
-    const resolution
-    of resolutions
-  ) {
-
-    const data =
-      profile[resolution];
-
-    console.log(
-      `${resolution}p -> ` +
-      `min=${data.min} ` +
-      `max=${data.max} ` +
-      `median=${Math.round(data.median)} ` +
-      `count=${data.count}`
-    );
-  }
-}
-
-
-/* ============================================================
-   Infer resolution from size
-   ============================================================
- *
- * IMPORTANT:
- *
- * We only infer when there is sufficient evidence.
- *
- * We DO NOT do this:
- *
- *      1080p exists
- *      file is smaller
- *      therefore file = 720p
- *
- * That was causing the previous problem.
- *
- * ============================================================
- */
-
-function inferFromSize(
-  torrent,
-  profile
-) {
+  /*
+   * ------------------------------------------------------------
+   * STEP 2
+   *
+   * No resolution in filename.
+   *
+   * Use fixed size classification.
+   * ------------------------------------------------------------
+   */
 
   const size =
-    getSize(torrent);
-
-  if (!size) {
-    return 0;
-  }
-
-  const known =
-    Object.entries(profile)
-      .map(
-        ([resolution, data]) => ({
-          resolution:
-            Number(resolution),
-
-          ...data
-        })
-      )
-      .sort(
-        (a, b) =>
-          a.median - b.median
-      );
-
-  if (!known.length) {
-    return 0;
-  }
-
-
-  /* ----------------------------------------------------------
-     CASE 1
-     Size falls directly inside a known resolution range.
-     ---------------------------------------------------------- */
-
-  const rangeMatches =
-    known.filter(item =>
-      size >= item.min &&
-      size <= item.max
+    getTorrentSize(
+      torrent
     );
 
-  if (rangeMatches.length > 0) {
 
-    return rangeMatches.sort(
-      (a, b) =>
-        Math.abs(
-          size - a.median
-        ) -
-        Math.abs(
-          size - b.median
-        )
-    )[0].resolution;
-  }
+  const inferredResolution =
+    inferResolutionFromSize(
+      size
+    );
 
 
-  /* ----------------------------------------------------------
-     CASE 2
-     Size falls between two known resolution ranges.
-     ---------------------------------------------------------- */
-
-  for (
-    let i = 0;
-    i < known.length - 1;
-    i++
-  ) {
-
-    const lower =
-      known[i];
-
-    const higher =
-      known[i + 1];
-
-    if (
-      size > lower.max &&
-      size < higher.min
-    ) {
-
-      const distanceToLower =
-        Math.abs(
-          size - lower.median
-        );
-
-      const distanceToHigher =
-        Math.abs(
-          size - higher.median
-        );
-
-      /*
-       * Only infer if the file is reasonably close
-       * to one of the known resolution profiles.
-       *
-       * This prevents a 300MB file from suddenly
-       * becoming 720p just because 720p is the
-       * lowest known resolution.
-       */
-
-      const closest =
-        distanceToLower <=
-        distanceToHigher
-          ? lower
-          : higher;
-
-      const closestDistance =
-        Math.min(
-          distanceToLower,
-          distanceToHigher
-        );
-
-      /*
-       * Require the size to be reasonably close to
-       * the known profile.
-       *
-       * Maximum allowed distance:
-       * 60% of the closest profile median.
-       */
-
-      const maximumDistance =
-        closest.median * 0.60;
-
-      if (
-        closestDistance <=
-        maximumDistance
-      ) {
-
-        return closest.resolution;
-      }
-
-      return 0;
-    }
-  }
+  console.log(
+    `🔍 Inferred resolution: ` +
+    `${inferredResolution > 0
+      ? inferredResolution + "p"
+      : "unknown"} | ` +
+    `${torrent.name} | ` +
+    `size=${size}`
+  );
 
 
-  /* ----------------------------------------------------------
-     CASE 3
-     Smaller than every known resolution.
-     ----------------------------------------------------------
-     
-     DO NOT invent a resolution.
+  return {
+    ...torrent,
 
-     Example:
+    inferredResolution,
 
-         Known:
-         720p = 1.1GB - 1.7GB
-
-         Unknown:
-         300MB
-
-     Result:
-
-         unknown
-     ---------------------------------------------------------- */
-
-  if (
-    size <
-    known[0].min
-  ) {
-
-    return 0;
-  }
-
-
-  /* ----------------------------------------------------------
-     CASE 4
-     Larger than every known resolution.
-     ----------------------------------------------------------
-     
-     DO NOT invent a higher resolution.
-     ---------------------------------------------------------- */
-
-  if (
-    size >
-    known[known.length - 1].max
-  ) {
-
-    return 0;
-  }
-
-
-  return 0;
+    resolutionSource:
+      inferredResolution > 0
+        ? "fixed-size-analysis"
+        : "unknown"
+  };
 }
 
 
 /* ============================================================
-   Analyze complete movie group
+   ANALYZE COMPLETE TORRENT LIST
    ============================================================
  *
- * IMPORTANT:
+ * NOTE:
  *
- * This function MUST receive the ORIGINAL COMPLETE group.
+ * The torrents argument is retained for compatibility with the
+ * existing code.
  *
- * Example:
+ * We deliberately DO NOT compare torrents against each other.
  *
- *      analyzeResolutions(group)
- *
- * NOT:
- *
- *      analyzeResolutions(metadataReady)
- *
- * NOT:
- *
- *      analyzeResolutions(pool)
- *
- * NOT:
- *
- *      analyzeResolutions(nonPreDVD)
- *
- * The analyzer needs the entire group to establish the
- * correct size profile.
+ * This is the key change that makes the result deterministic.
  *
  * ============================================================
  */
@@ -467,7 +300,14 @@ export function analyzeResolutions(
 ) {
 
   if (
-    !Array.isArray(torrents) ||
+    !Array.isArray(torrents)
+  ) {
+
+    return [];
+  }
+
+
+  if (
     torrents.length === 0
   ) {
 
@@ -475,123 +315,79 @@ export function analyzeResolutions(
   }
 
 
-  /*
-   * Build profile from the COMPLETE group.
-   */
+  console.log(
+    "\n📊 Resolution analysis:"
+  );
 
-  const profile =
-    buildResolutionProfile(
-      torrents
-    );
+  console.log(
+    "Using fixed size thresholds " +
+    "(no cross-torrent profile)"
+  );
 
+  console.log(
+    `360p  : < ${Math.round(
+      SIZE_THRESHOLD_360 / MB
+    )} MB`
+  );
 
-  /*
-   * Show profile in console.
-   */
+  console.log(
+    `480p  : ${Math.round(
+      SIZE_THRESHOLD_360 / MB
+    )} MB - < ${Math.round(
+      SIZE_THRESHOLD_480 / MB
+    )} MB`
+  );
 
-  printResolutionProfile(
-    profile
+  console.log(
+    `720p  : ${Math.round(
+      SIZE_THRESHOLD_480 / MB
+    )} MB - < ${(
+      SIZE_THRESHOLD_720 / GB
+    ).toFixed(2)} GB`
+  );
+
+  console.log(
+    `1080p : >= ${(
+      SIZE_THRESHOLD_720 / GB
+    ).toFixed(2)} GB`
   );
 
 
   /*
-   * Analyze every torrent.
+   * Analyze every torrent independently.
    */
 
   return torrents.map(
-    torrent => {
-
-      /*
-       * First check the filename.
-       */
-
-      const actualResolution =
-        extractResolution(
-          torrent?.name
-        );
-
-
-      /*
-       * ------------------------------------------------------
-       * Resolution explicitly present.
-       * ------------------------------------------------------
-       *
-       * NEVER override it.
-       */
-
-      if (
-        actualResolution > 0
-      ) {
-
-        return {
-
-          ...torrent,
-
-          inferredResolution:
-            actualResolution,
-
-          resolutionSource:
-            "filename"
-        };
-      }
-
-
-      /*
-       * ------------------------------------------------------
-       * Resolution missing.
-       * ------------------------------------------------------
-       *
-       * Try size analysis.
-       */
-
-      const inferredResolution =
-        inferFromSize(
-          torrent,
-          profile
-        );
-
-
-      console.log(
-        `🔍 Inferred resolution: ` +
-        `${inferredResolution > 0
-          ? inferredResolution + "p"
-          : "unknown"} | ` +
-        `${torrent.name}`
-      );
-
-
-      return {
-
-        ...torrent,
-
-        inferredResolution,
-
-        resolutionSource:
-          inferredResolution > 0
-            ? "size-analysis"
-            : "unknown"
-      };
-    }
+    torrent =>
+      analyzeTorrent(
+        torrent
+      )
   );
 }
 
 
 /* ============================================================
-   Get analyzed resolution
+   GET ANALYZED RESOLUTION
    ============================================================ */
 
 export function getAnalyzedResolution(
   torrent
 ) {
 
+  if (!torrent) {
+    return 0;
+  }
+
+
   /*
-   * Prefer the value produced by the analyzer.
+   * First use the value generated by the analyzer.
    */
 
   const inferred =
     Number(
-      torrent?.inferredResolution
+      torrent.inferredResolution
     );
+
 
   if (
     Number.isFinite(inferred) &&
@@ -603,10 +399,80 @@ export function getAnalyzedResolution(
 
 
   /*
-   * Otherwise read directly from filename.
+   * Then check the filename directly.
    */
 
-  return extractResolution(
-    torrent?.name
+  const explicit =
+    extractResolution(
+      torrent.name
+    );
+
+
+  if (
+    explicit > 0
+  ) {
+
+    return explicit;
+  }
+
+
+  /*
+   * Finally use the fixed size fallback.
+   */
+
+  const size =
+    getTorrentSize(
+      torrent
+    );
+
+
+  return inferResolutionFromSize(
+    size
   );
 }
+
+
+/* ============================================================
+   OPTIONAL DEBUG HELPER
+   ============================================================ */
+
+export function getResolutionSource(
+  torrent
+) {
+
+  if (!torrent) {
+    return "unknown";
+  }
+
+
+  if (
+    torrent.resolutionSource
+  ) {
+
+    return torrent.resolutionSource;
+  }
+
+
+  if (
+    extractResolution(
+      torrent.name
+    ) > 0
+  ) {
+
+    return "filename";
+  }
+
+
+  if (
+    getTorrentSize(
+      torrent
+    ) > 0
+  ) {
+
+    return "fixed-size-analysis";
+  }
+
+
+  return "unknown";
+}
+
