@@ -1070,9 +1070,9 @@ export async function cleanupTodayTorrents() {
     hashesToDelete.length
   ) {
 
-    // await deleteTorrents(
-    //   hashesToDelete
-    // );
+    await deleteTorrents(
+      hashesToDelete
+    );
 
     console.log(
       "Duplicate torrents deleted"
