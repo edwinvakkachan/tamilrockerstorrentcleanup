@@ -1,3 +1,4 @@
+
 import { qb } from "./qb.js";
 import { publishMessage } from "../queue/publishMessage.js";
 import { delay } from "../delay.js";
@@ -10,6 +11,16 @@ import {
 const TWO_GB = 2 * 1024 * 1024 * 1024;
 const THREE_GB = 3 * 1024 * 1024 * 1024;
 const FIVE_GB = 5 * 1024 * 1024 * 1024;
+
+/*
+ * ============================================================
+ * METADATA RETRY SETTINGS
+ * ============================================================
+ */
+
+const METADATA_RETRY_INTERVAL = 30 * 1000; // 30 seconds
+const METADATA_MAX_RETRIES = 20;           // 10 minutes
+
 
 /* --------------------------------------------------
    Common Helper Functions
@@ -72,6 +83,7 @@ function detectLanguagePriority(name) {
   return 0;
 }
 
+
 /* --------------------------------------------------
    TV Torrent Sorting
 -------------------------------------------------- */
@@ -81,7 +93,6 @@ function sortTVTorrents(list) {
     .filter(t => getTorrentSize(t) < FIVE_GB)
     .sort((a, b) => {
 
-      // Avoid PreDVD
       const aPre = isPreDVD(a.name);
       const bPre = isPreDVD(b.name);
 
@@ -89,7 +100,6 @@ function sortTVTorrents(list) {
         return aPre ? 1 : -1;
       }
 
-      // Prefer Malayalam
       const aMal = isMalayalam(a.name);
       const bMal = isMalayalam(b.name);
 
@@ -97,7 +107,6 @@ function sortTVTorrents(list) {
         return bMal ? 1 : -1;
       }
 
-      // Prefer 1080p
       const a1080 = /1080p/i.test(a.name);
       const b1080 = /1080p/i.test(b.name);
 
@@ -105,7 +114,6 @@ function sortTVTorrents(list) {
         return b1080 ? 1 : -1;
       }
 
-      // Prefer HEVC
       const aHevc = /hevc|x265/i.test(a.name);
       const bHevc = /hevc|x265/i.test(b.name);
 
@@ -113,7 +121,6 @@ function sortTVTorrents(list) {
         return bHevc ? 1 : -1;
       }
 
-      // Prefer WEB-DL
       const aWeb = /web[- ]dl/i.test(a.name);
       const bWeb = /web[- ]dl/i.test(b.name);
 
@@ -121,50 +128,18 @@ function sortTVTorrents(list) {
         return bWeb ? 1 : -1;
       }
 
-      // Larger size
       return getTorrentSize(b) - getTorrentSize(a);
     });
 }
+
 
 /* --------------------------------------------------
    Movie Helpers
 -------------------------------------------------- */
 
-/*
- * IMPORTANT:
- *
- * Resolution is now taken from resolutionAnalyzer.js.
- *
- * This means:
- *
- * 1. If filename contains 1080p/720p/etc,
- *    that value is used.
- *
- * 2. If filename has no resolution,
- *    the analyzer may infer one using the
- *    other torrents from the same movie group.
- */
-function getResolutionValue(torrent) {
-  return getAnalyzedResolution(torrent);
-}
-
-/*
- * General movie sorter.
- *
- * Used after the resolution has already been selected.
- *
- * Priority:
- * 1. Non-PreDVD
- * 2. Malayalam
- * 3. Resolution
- * 4. Smallest file
- * 5. HEVC/x265
- * 6. WEB-DL
- */
 function sortByLanguageAndSize(list) {
   return [...list].sort((a, b) => {
 
-    // Avoid PreDVD
     const aPre = isPreDVD(a.name);
     const bPre = isPreDVD(b.name);
 
@@ -172,7 +147,6 @@ function sortByLanguageAndSize(list) {
       return aPre ? 1 : -1;
     }
 
-    // Prefer Malayalam
     const langDiff =
       detectLanguagePriority(b.name) -
       detectLanguagePriority(a.name);
@@ -181,12 +155,11 @@ function sortByLanguageAndSize(list) {
       return langDiff;
     }
 
-    // Prefer resolution
     const aResolution =
-      getResolutionValue(a);
+      getAnalyzedResolution(a);
 
     const bResolution =
-      getResolutionValue(b);
+      getAnalyzedResolution(b);
 
     if (aResolution !== bResolution) {
 
@@ -201,7 +174,6 @@ function sortByLanguageAndSize(list) {
       return bResolution - aResolution;
     }
 
-    // Prefer smallest file
     const sizeDiff =
       getTorrentSize(a) -
       getTorrentSize(b);
@@ -210,7 +182,6 @@ function sortByLanguageAndSize(list) {
       return sizeDiff;
     }
 
-    // Prefer HEVC/x265
     const aHevc =
       /hevc|x265/i.test(a.name);
 
@@ -221,7 +192,6 @@ function sortByLanguageAndSize(list) {
       return bHevc ? 1 : -1;
     }
 
-    // Prefer WEB-DL
     const aWeb =
       /web[- ]dl/i.test(a.name);
 
@@ -235,6 +205,7 @@ function sortByLanguageAndSize(list) {
     return 0;
   });
 }
+
 
 /* --------------------------------------------------
    Select Best Torrent
@@ -253,12 +224,6 @@ function selectBestTorrent(torrents) {
    * ==================================================
    * ABSOLUTE PRE-DVD RULE
    * ==================================================
-   *
-   * If ANY non-PreDVD torrent exists in the original
-   * analyzed group, PreDVD torrents are NEVER allowed
-   * to be selected.
-   *
-   * This check happens BEFORE metadataReady filtering.
    */
 
   const hasNonPreDVD =
@@ -269,16 +234,6 @@ function selectBestTorrent(torrents) {
         !isPreDVD(t.name)
     );
 
-  /*
-   * If normal torrents exist:
-   *
-   * ONLY non-PreDVD torrents are allowed.
-   *
-   * If there are no normal torrents:
-   *
-   * PreDVD is allowed.
-   */
-
   const selectionSource =
     hasNonPreDVD
       ? torrents.filter(
@@ -288,10 +243,8 @@ function selectBestTorrent(torrents) {
 
   /*
    * ==================================================
-   * ONLY USE TORRENTS WITH VALID QBITTORRENT METADATA
+   * ONLY USE TORRENTS WITH VALID QB METADATA
    * ==================================================
-   *
-   * Size is taken ONLY from torrent.size.
    */
 
   const metadataReady =
@@ -358,12 +311,6 @@ function selectBestTorrent(torrents) {
       ? malayalamTorrents
       : metadataReady;
 
-  /*
-   * ==================================================
-   * HELPERS
-   * ==================================================
-   */
-
   const sizeOf =
     torrent =>
       Number(torrent.size);
@@ -388,7 +335,7 @@ function selectBestTorrent(torrents) {
 
   /*
    * ==================================================
-   * DEBUG
+   * RESOLUTION DEBUG
    * ==================================================
    */
 
@@ -412,10 +359,6 @@ function selectBestTorrent(torrents) {
    * ==================================================
    * 1. PREFER 1080p <= 3.5 GB
    * ==================================================
-   *
-   * If multiple suitable 1080p files exist:
-   *
-   * Choose the SMALLEST actual torrent size.
    */
 
   const MAX_1080_SIZE =
@@ -451,9 +394,6 @@ function selectBestTorrent(torrents) {
     return [...suitable1080]
       .sort((a, b) => {
 
-        /*
-         * Smallest actual size.
-         */
         const sizeDiff =
           sizeOf(a) -
           sizeOf(b);
@@ -462,10 +402,6 @@ function selectBestTorrent(torrents) {
           return sizeDiff;
         }
 
-        /*
-         * Same size:
-         * Prefer HEVC/x265.
-         */
         const hevcDiff =
           Number(isHEVC(b)) -
           Number(isHEVC(a));
@@ -474,10 +410,6 @@ function selectBestTorrent(torrents) {
           return hevcDiff;
         }
 
-        /*
-         * Same size/codec:
-         * Prefer WEB-DL.
-         */
         const aWeb =
           /web[- ]dl/i.test(
             a.name
@@ -492,6 +424,7 @@ function selectBestTorrent(torrents) {
           Number(bWeb) -
           Number(aWeb)
         );
+
       })[0];
   }
 
@@ -516,12 +449,6 @@ function selectBestTorrent(torrents) {
       1024 *
       1024;
 
-    /*
-     * 720p <= 2 GB
-     *
-     * Choose the LARGEST file up to 2 GB.
-     */
-
     const suitable720 =
       torrents720.filter(
         t =>
@@ -536,9 +463,6 @@ function selectBestTorrent(torrents) {
       return [...suitable720]
         .sort((a, b) => {
 
-          /*
-           * Largest file first.
-           */
           const sizeDiff =
             sizeOf(b) -
             sizeOf(a);
@@ -547,10 +471,6 @@ function selectBestTorrent(torrents) {
             return sizeDiff;
           }
 
-          /*
-           * Same size:
-           * Prefer HEVC/x265.
-           */
           const hevcDiff =
             Number(isHEVC(b)) -
             Number(isHEVC(a));
@@ -559,10 +479,6 @@ function selectBestTorrent(torrents) {
             return hevcDiff;
           }
 
-          /*
-           * Same size/codec:
-           * Prefer WEB-DL.
-           */
           const aWeb =
             /web[- ]dl/i.test(
               a.name
@@ -577,13 +493,13 @@ function selectBestTorrent(torrents) {
             Number(bWeb) -
             Number(aWeb)
           );
+
         })[0];
     }
 
     /*
-     * 720p EXISTS BUT ALL ARE > 2 GB
-     *
-     * Choose the smallest 720p.
+     * 720p exists but all are >2GB.
+     * Choose smallest 720p.
      */
 
     return [...torrents720]
@@ -606,6 +522,7 @@ function selectBestTorrent(torrents) {
         }
 
         return 0;
+
       })[0];
   }
 
@@ -613,7 +530,7 @@ function selectBestTorrent(torrents) {
    * ==================================================
    * 3. NO 720p
    *
-   * USE 1080p EVEN IF > 3.5 GB
+   * USE 1080p EVEN IF >3.5GB
    * ==================================================
    */
 
@@ -627,9 +544,6 @@ function selectBestTorrent(torrents) {
     return [...all1080]
       .sort((a, b) => {
 
-        /*
-         * Choose smallest 1080p.
-         */
         const sizeDiff =
           sizeOf(a) -
           sizeOf(b);
@@ -647,6 +561,7 @@ function selectBestTorrent(torrents) {
         }
 
         return 0;
+
       })[0];
   }
 
@@ -682,11 +597,6 @@ function selectBestTorrent(torrents) {
           highestResolution
       );
 
-    /*
-     * Same resolution:
-     * choose smallest actual size.
-     */
-
     return [
       ...highestResolutionTorrents
     ].sort((a, b) => {
@@ -708,6 +618,7 @@ function selectBestTorrent(torrents) {
       }
 
       return 0;
+
     })[0];
   }
 
@@ -715,35 +626,18 @@ function selectBestTorrent(torrents) {
    * ==================================================
    * 5. NO RECOGNIZABLE RESOLUTION
    * ==================================================
-   *
-   * IMPORTANT:
-   *
-   * Do NOT blindly select the smallest file anymore.
-   *
-   * If every candidate has an unknown resolution,
-   * use the existing language/size sorter rather than
-   * allowing an unknown 300MB file to automatically win.
-   *
-   * This keeps the decision deterministic while avoiding
-   * the old resolution=0 -> smallest-file behavior.
    */
 
-  const sortedUnknown =
-    sortByLanguageAndSize(
-      pool
-    );
-
-  if (
-    sortedUnknown.length > 0
-  ) {
-    return sortedUnknown[0];
-  }
-
-  return null;
+  return [...pool].sort(
+    (a, b) =>
+      sizeOf(a) -
+      sizeOf(b)
+  )[0];
 }
 
+
 /* --------------------------------------------------
-   Cleanup Torrents
+   Cleanup Helpers
 -------------------------------------------------- */
 
 function extractMovieKey(name) {
@@ -773,6 +667,11 @@ function extractMovieKey(name) {
     .toLowerCase();
 }
 
+
+/* --------------------------------------------------
+   Get Torrents By Tag
+-------------------------------------------------- */
+
 export async function getTorrentsByTag(tag) {
 
   const { data } =
@@ -792,6 +691,11 @@ export async function getTorrentsByTag(tag) {
 
   return data;
 }
+
+
+/* --------------------------------------------------
+   Delete Torrents
+-------------------------------------------------- */
 
 export async function deleteTorrents(
   hashes
@@ -813,9 +717,231 @@ export async function deleteTorrents(
   );
 }
 
+
+/* ============================================================
+   NEW:
+   GET CURRENT MOVIE GROUP AGAIN
+   ============================================================ */
+
+async function getCurrentMovieGroup(
+  tag,
+  movieKey
+) {
+
+  const currentTorrents =
+    await getTorrentsByTag(tag);
+
+  const currentGroup =
+    currentTorrents.filter(
+      torrent =>
+        extractMovieKey(
+          torrent.name
+        ) === movieKey
+    );
+
+  return currentGroup;
+}
+
+
+/* ============================================================
+   NEW:
+   CHECK WHETHER METADATA IS READY
+   ============================================================ */
+
+function hasCompletedMetadata(
+  torrents
+) {
+
+  if (
+    !Array.isArray(torrents) ||
+    torrents.length === 0
+  ) {
+    return false;
+  }
+
+  return torrents.some(torrent => {
+
+    const size =
+      Number(torrent.size);
+
+    return (
+      Number.isFinite(size) &&
+      size > 0 &&
+      typeof torrent.name === "string" &&
+      torrent.name.trim() !== ""
+    );
+  });
+}
+
+
+/* ============================================================
+   NEW:
+   WAIT FOR MOVIE METADATA
+   ============================================================
+ *
+ * Only called when selectBestTorrent() returns null.
+ *
+ * It re-fetches qBittorrent every 30 seconds.
+ *
+ * IMPORTANT:
+ * It does NOT restart cleanupTodayTorrents().
+ * It only waits for this movie.
+ *
+ * ============================================================
+ */
+
+async function waitForMovieMetadata(
+  tag,
+  movieKey,
+  initialGroup
+) {
+
+  let currentGroup =
+    initialGroup;
+
+  /*
+   * If metadata is already available,
+   * no retry is required.
+   */
+
+  if (
+    hasCompletedMetadata(
+      currentGroup
+    )
+  ) {
+
+    return currentGroup;
+  }
+
+  console.log(
+    `⏳ Metadata not ready for ${movieKey}. ` +
+    `Waiting for qBittorrent metadata...`
+  );
+
+  await publishMessage({
+    message:
+      `⏳ Metadata not ready for ${movieKey}. ` +
+      `Waiting for qBittorrent metadata...`
+  });
+
+
+  for (
+    let attempt = 1;
+    attempt <= METADATA_MAX_RETRIES;
+    attempt++
+  ) {
+
+    console.log(
+      `⏳ ${movieKey}: metadata retry ` +
+      `${attempt}/${METADATA_MAX_RETRIES} ` +
+      `(next check in 30 seconds)`
+    );
+
+    await publishMessage({
+      message:
+        `⏳ ${movieKey}: metadata retry ` +
+        `${attempt}/${METADATA_MAX_RETRIES}`
+    });
+
+    await delay(
+      METADATA_RETRY_INTERVAL,
+      true
+    );
+
+
+    /*
+     * Re-fetch the current qBittorrent list.
+     */
+
+    try {
+
+      currentGroup =
+        await getCurrentMovieGroup(
+          tag,
+          movieKey
+        );
+
+    } catch (error) {
+
+      console.error(
+        `❌ Failed to refresh metadata for ${movieKey}:`,
+        error
+      );
+
+      continue;
+    }
+
+
+    /*
+     * Movie may have disappeared.
+     */
+
+    if (
+      !currentGroup.length
+    ) {
+
+      console.log(
+        `⚠️ ${movieKey} is no longer present in qBittorrent.`
+      );
+
+      return [];
+    }
+
+
+    /*
+     * Check whether at least one torrent
+     * now has completed qBittorrent metadata.
+     */
+
+    if (
+      hasCompletedMetadata(
+        currentGroup
+      )
+    ) {
+
+      console.log(
+        `✅ Metadata completed for ${movieKey} ` +
+        `after ${attempt} retry attempt(s).`
+      );
+
+      await publishMessage({
+        message:
+          `✅ Metadata completed for ${movieKey} ` +
+          `after ${attempt} retry attempt(s).`
+      });
+
+      return currentGroup;
+    }
+  }
+
+
+  /*
+   * Metadata never became available.
+   */
+
+  console.log(
+    `⏰ Metadata still incomplete for ${movieKey} ` +
+    `after ${METADATA_MAX_RETRIES} retries.`
+  );
+
+  await publishMessage({
+    message:
+      `⏰ Metadata still incomplete for ${movieKey} ` +
+      `after ${METADATA_MAX_RETRIES} retries.`
+  });
+
+  return null;
+}
+
+
+/* --------------------------------------------------
+   Cleanup Torrents
+-------------------------------------------------- */
+
 export async function cleanupTodayTorrents() {
 
-  const tag = "script";
+  const tag =
+    "script";
 
   await publishMessage({
     message:
@@ -826,15 +952,19 @@ export async function cleanupTodayTorrents() {
     `Searching QB torrents with tag: ${tag}`
   );
 
-  const torrents =
-    await getTorrentsByTag(
-      tag
-    );
+
+  /*
+   * Initial torrent list.
+   */
+
+  let torrents =
+    await getTorrentsByTag(tag);
 
   await delay(
     2000,
     true
   );
+
 
   if (
     !torrents.length
@@ -851,6 +981,7 @@ export async function cleanupTodayTorrents() {
 
     return;
   }
+
 
   /*
    * ==================================================
@@ -870,7 +1001,10 @@ export async function cleanupTodayTorrents() {
         torrent.name
       );
 
-    if (!grouped[key]) {
+    if (
+      !grouped[key]
+    ) {
+
       grouped[key] = [];
     }
 
@@ -879,7 +1013,9 @@ export async function cleanupTodayTorrents() {
     );
   }
 
+
   const hashesToDelete = [];
+
 
   /*
    * ==================================================
@@ -892,8 +1028,14 @@ export async function cleanupTodayTorrents() {
     in grouped
   ) {
 
-    const group =
+    let group =
       grouped[movie];
+
+
+    /*
+     * Only one torrent:
+     * nothing to clean.
+     */
 
     if (
       group.length === 1
@@ -901,40 +1043,125 @@ export async function cleanupTodayTorrents() {
       continue;
     }
 
+
     /*
      * ==================================================
+     * FIRST RESOLUTION ANALYSIS
+     *
      * IMPORTANT:
-     *
-     * Resolution analysis MUST happen on the COMPLETE
-     * original group.
-     *
-     * Do NOT pass:
-     *
-     * metadataReady
-     * nonPreDVD
-     * pool
-     *
-     * to analyzeResolutions().
-     *
-     * The analyzer needs ALL candidates so it can learn
-     * the size/resolution relationship.
+     * Analyze the COMPLETE group.
      * ==================================================
      */
 
-    const analyzedGroup =
+    let analyzedGroup =
       analyzeResolutions(
         group
       );
 
-    /*
-     * Select the best torrent using the analyzed
-     * resolution information.
-     */
 
-    const best =
+    let best =
       selectBestTorrent(
         analyzedGroup
       );
+
+
+    /*
+     * ==================================================
+     * IF NO TORRENT HAS COMPLETED METADATA:
+     *
+     * WAIT AND RE-FETCH THIS MOVIE.
+     * ==================================================
+     */
+
+    if (!best) {
+
+      const refreshedGroup =
+        await waitForMovieMetadata(
+          tag,
+          movie,
+          group
+        );
+
+
+      /*
+       * Metadata still unavailable.
+       */
+
+      if (
+        !refreshedGroup ||
+        !refreshedGroup.length
+      ) {
+
+        console.log(
+          `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
+        );
+
+        await publishMessage({
+          message:
+            `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
+        });
+
+        continue;
+      }
+
+
+      /*
+       * Use the freshly fetched qBittorrent
+       * objects from this point onward.
+       */
+
+      group =
+        refreshedGroup;
+
+
+      /*
+       * Re-run resolution analysis using
+       * the NEW metadata.
+       */
+
+      analyzedGroup =
+        analyzeResolutions(
+          group
+        );
+
+
+      /*
+       * Run the complete existing selection
+       * logic again.
+       */
+
+      best =
+        selectBestTorrent(
+          analyzedGroup
+        );
+
+
+      /*
+       * Extremely unlikely, but protect against
+       * metadata disappearing between requests.
+       */
+
+      if (!best) {
+
+        console.log(
+          `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
+        );
+
+        await publishMessage({
+          message:
+            `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
+        });
+
+        continue;
+      }
+    }
+
+
+    /*
+     * ==================================================
+     * DISPLAY CANDIDATES
+     * ==================================================
+     */
 
     const separator =
       "========================================";
@@ -948,6 +1175,7 @@ export async function cleanupTodayTorrents() {
         separator
     });
 
+
     console.log(
       `Checking duplicates for: ${movie}`
     );
@@ -957,9 +1185,6 @@ export async function cleanupTodayTorrents() {
         `Checking duplicates for: ${movie}`
     });
 
-    /*
-     * Show ORIGINAL torrent candidates.
-     */
 
     for (
       const torrent
@@ -976,26 +1201,11 @@ export async function cleanupTodayTorrents() {
       });
     }
 
-    /*
-     * No valid torrent.
-     */
-
-    if (!best) {
-
-      console.log(
-        `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
-      );
-
-      await publishMessage({
-        message:
-          `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
-      });
-
-      continue;
-    }
 
     /*
-     * Show selected torrent.
+     * ==================================================
+     * KEEP BEST
+     * ==================================================
      */
 
     console.log(
@@ -1006,6 +1216,7 @@ export async function cleanupTodayTorrents() {
       message:
         `Keeping: ${best.name}`
     });
+
 
     /*
      * ==================================================
@@ -1020,14 +1231,16 @@ export async function cleanupTodayTorrents() {
           best.hash
       );
 
+
     for (
       const torrent
       of torrentsToDelete
     ) {
 
       /*
-       * If this is a PreDVD torrent carrying the
-       * predvd tag, add the movie to Radarr cleanup queue.
+       * If this is a PreDVD torrent carrying
+       * the predvd tag, add the movie to the
+       * Radarr cleanup queue.
        */
 
       if (
@@ -1054,11 +1267,13 @@ export async function cleanupTodayTorrents() {
         );
       }
 
+
       hashesToDelete.push(
         torrent.hash
       );
     }
   }
+
 
   /*
    * ==================================================
