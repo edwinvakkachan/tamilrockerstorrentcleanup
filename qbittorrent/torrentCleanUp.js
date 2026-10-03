@@ -1,4 +1,3 @@
-
 import { qb } from "./qb.js";
 import { publishMessage } from "../queue/publishMessage.js";
 import { delay } from "../delay.js";
@@ -12,26 +11,15 @@ const TWO_GB = 2 * 1024 * 1024 * 1024;
 const THREE_GB = 3 * 1024 * 1024 * 1024;
 const FIVE_GB = 5 * 1024 * 1024 * 1024;
 
-/*
- * ============================================================
- * METADATA RETRY SETTINGS
- * ============================================================
- */
-
-const METADATA_RETRY_INTERVAL = 30 * 1000; // 30 seconds
-const METADATA_MAX_RETRIES = 20;           // 10 minutes
+const METADATA_RETRY_INTERVAL = 30 * 1000;
 
 
-/* --------------------------------------------------
-   Common Helper Functions
--------------------------------------------------- */
+/* ============================================================
+   COMMON HELPERS
+============================================================ */
 
 function isTVShow(name) {
   return /\bS\d{1,2}\s?(E\d{1,2}|EP)\b/i.test(name);
-}
-
-function isMalayalam(name) {
-  return hasFullMalayalam(name) || hasMalayalamCode(name);
 }
 
 function isPreDVD(name) {
@@ -72,11 +60,21 @@ function hasTamilCode(name) {
   return /\btam\b/i.test(name);
 }
 
+function isMalayalam(name) {
+  return (
+    hasFullMalayalam(name) ||
+    hasMalayalamCode(name)
+  );
+}
+
 function detectLanguagePriority(name) {
+
   if (hasFullMalayalam(name)) return 60;
   if (hasMalayalamCode(name)) return 50;
+
   if (hasFullHindi(name)) return 40;
   if (hasHindiCode(name)) return 30;
+
   if (hasFullTamil(name)) return 20;
   if (hasTamilCode(name)) return 10;
 
@@ -84,68 +82,100 @@ function detectLanguagePriority(name) {
 }
 
 
-/* --------------------------------------------------
-   TV Torrent Sorting
--------------------------------------------------- */
+/* ============================================================
+   TV TORRENT SORTING
+============================================================ */
 
 function sortTVTorrents(list) {
+
   return [...list]
-    .filter(t => getTorrentSize(t) < FIVE_GB)
+    .filter(
+      torrent =>
+        getTorrentSize(torrent) < FIVE_GB
+    )
     .sort((a, b) => {
 
-      const aPre = isPreDVD(a.name);
-      const bPre = isPreDVD(b.name);
+      const aPre =
+        isPreDVD(a.name);
+
+      const bPre =
+        isPreDVD(b.name);
 
       if (aPre !== bPre) {
         return aPre ? 1 : -1;
       }
 
-      const aMal = isMalayalam(a.name);
-      const bMal = isMalayalam(b.name);
+
+      const aMal =
+        isMalayalam(a.name);
+
+      const bMal =
+        isMalayalam(b.name);
 
       if (aMal !== bMal) {
         return bMal ? 1 : -1;
       }
 
-      const a1080 = /1080p/i.test(a.name);
-      const b1080 = /1080p/i.test(b.name);
+
+      const a1080 =
+        /1080p/i.test(a.name);
+
+      const b1080 =
+        /1080p/i.test(b.name);
 
       if (a1080 !== b1080) {
         return b1080 ? 1 : -1;
       }
 
-      const aHevc = /hevc|x265/i.test(a.name);
-      const bHevc = /hevc|x265/i.test(b.name);
+
+      const aHevc =
+        /hevc|x265/i.test(a.name);
+
+      const bHevc =
+        /hevc|x265/i.test(b.name);
 
       if (aHevc !== bHevc) {
         return bHevc ? 1 : -1;
       }
 
-      const aWeb = /web[- ]dl/i.test(a.name);
-      const bWeb = /web[- ]dl/i.test(b.name);
+
+      const aWeb =
+        /web[- ]dl/i.test(a.name);
+
+      const bWeb =
+        /web[- ]dl/i.test(b.name);
 
       if (aWeb !== bWeb) {
         return bWeb ? 1 : -1;
       }
 
-      return getTorrentSize(b) - getTorrentSize(a);
+
+      return (
+        getTorrentSize(b) -
+        getTorrentSize(a)
+      );
     });
 }
 
 
-/* --------------------------------------------------
-   Movie Helpers
--------------------------------------------------- */
+/* ============================================================
+   MOVIE SORTING
+============================================================ */
 
 function sortByLanguageAndSize(list) {
+
   return [...list].sort((a, b) => {
 
-    const aPre = isPreDVD(a.name);
-    const bPre = isPreDVD(b.name);
+    const aPre =
+      isPreDVD(a.name);
+
+    const bPre =
+      isPreDVD(b.name);
 
     if (aPre !== bPre) {
       return aPre ? 1 : -1;
     }
+
 
     const langDiff =
       detectLanguagePriority(b.name) -
@@ -155,13 +185,17 @@ function sortByLanguageAndSize(list) {
       return langDiff;
     }
 
+
     const aResolution =
       getAnalyzedResolution(a);
 
     const bResolution =
       getAnalyzedResolution(b);
 
-    if (aResolution !== bResolution) {
+    if (
+      aResolution !==
+      bResolution
+    ) {
 
       if (aResolution === 1080) {
         return -1;
@@ -171,8 +205,12 @@ function sortByLanguageAndSize(list) {
         return 1;
       }
 
-      return bResolution - aResolution;
+      return (
+        bResolution -
+        aResolution
+      );
     }
+
 
     const sizeDiff =
       getTorrentSize(a) -
@@ -181,6 +219,7 @@ function sortByLanguageAndSize(list) {
     if (sizeDiff !== 0) {
       return sizeDiff;
     }
+
 
     const aHevc =
       /hevc|x265/i.test(a.name);
@@ -192,6 +231,7 @@ function sortByLanguageAndSize(list) {
       return bHevc ? 1 : -1;
     }
 
+
     const aWeb =
       /web[- ]dl/i.test(a.name);
 
@@ -202,14 +242,22 @@ function sortByLanguageAndSize(list) {
       return bWeb ? 1 : -1;
     }
 
+
     return 0;
   });
 }
 
 
-/* --------------------------------------------------
-   Select Best Torrent
--------------------------------------------------- */
+/* ============================================================
+   SELECT BEST TORRENT
+
+   IMPORTANT:
+
+   This function only considers torrents that currently
+   have valid qBittorrent metadata.
+
+   size = 0 torrents are ignored.
+============================================================ */
 
 function selectBestTorrent(torrents) {
 
@@ -220,112 +268,128 @@ function selectBestTorrent(torrents) {
     return null;
   }
 
-  /*
-   * ==================================================
-   * ABSOLUTE PRE-DVD RULE
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     PRE-DVD RULE
+  ---------------------------------------------------------- */
 
   const hasNonPreDVD =
     torrents.some(
-      t =>
-        typeof t.name === "string" &&
-        t.name.trim() !== "" &&
-        !isPreDVD(t.name)
+      torrent =>
+        typeof torrent.name === "string" &&
+        torrent.name.trim() !== "" &&
+        !isPreDVD(torrent.name)
     );
+
 
   const selectionSource =
     hasNonPreDVD
       ? torrents.filter(
-          t => !isPreDVD(t.name)
+          torrent =>
+            !isPreDVD(torrent.name)
         )
       : torrents;
 
-  /*
-   * ==================================================
-   * ONLY USE TORRENTS WITH VALID QB METADATA
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     ONLY METADATA-READY TORRENTS
+  ---------------------------------------------------------- */
 
   const metadataReady =
-    selectionSource.filter(t => {
+    selectionSource.filter(
+      torrent => {
 
-      const size =
-        Number(t.size);
+        const size =
+          Number(torrent.size);
 
-      return (
-        Number.isFinite(size) &&
-        size > 0 &&
-        typeof t.name === "string" &&
-        t.name.trim() !== ""
-      );
-    });
+        return (
+          Number.isFinite(size) &&
+          size > 0 &&
+          typeof torrent.name === "string" &&
+          torrent.name.trim() !== ""
+        );
+      }
+    );
 
-  if (!metadataReady.length) {
+
+  if (
+    !metadataReady.length
+  ) {
 
     console.log(
       hasNonPreDVD
-        ? "No non-PreDVD torrents have valid qBittorrent metadata yet."
-        : "No torrents have valid qBittorrent metadata yet."
+        ? "⏳ No non-PreDVD torrent has completed metadata yet."
+        : "⏳ No torrent has completed metadata yet."
     );
 
     return null;
   }
 
-  /*
-   * ==================================================
-   * TV SHOWS
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     TV SHOWS
+  ---------------------------------------------------------- */
 
   const tvTorrents =
     metadataReady.filter(
-      t => isTVShow(t.name)
+      torrent =>
+        isTVShow(torrent.name)
     );
 
-  if (tvTorrents.length > 0) {
+
+  if (
+    tvTorrents.length > 0
+  ) {
 
     const sortedTV =
       sortTVTorrents(
         tvTorrents
       );
 
-    if (sortedTV.length > 0) {
+    if (
+      sortedTV.length > 0
+    ) {
       return sortedTV[0];
     }
   }
 
-  /*
-   * ==================================================
-   * MALAYALAM PREFERENCE
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     MALAYALAM PREFERENCE
+  ---------------------------------------------------------- */
 
   const malayalamTorrents =
     metadataReady.filter(
-      t => isMalayalam(t.name)
+      torrent =>
+        isMalayalam(torrent.name)
     );
+
 
   const pool =
     malayalamTorrents.length > 0
       ? malayalamTorrents
       : metadataReady;
 
+
   const sizeOf =
     torrent =>
       Number(torrent.size);
+
 
   const resolutionOf =
     torrent =>
       getAnalyzedResolution(torrent);
 
+
   const is1080 =
     torrent =>
       resolutionOf(torrent) === 1080;
 
+
   const is720 =
     torrent =>
       resolutionOf(torrent) === 720;
+
 
   const isHEVC =
     torrent =>
@@ -333,33 +397,35 @@ function selectBestTorrent(torrents) {
         torrent.name
       );
 
-  /*
-   * ==================================================
-   * RESOLUTION DEBUG
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     RESOLUTION DEBUG
+  ---------------------------------------------------------- */
 
   console.log(
     "\n🔎 RESOLUTION DEBUG:"
   );
 
-  for (const t of pool) {
+
+  for (
+    const torrent
+    of pool
+  ) {
 
     console.log(
-      `${t.name} | ` +
-      `size=${sizeOf(t)} | ` +
-      `resolution=${resolutionOf(t)} | ` +
-      `source=${t.resolutionSource || "filename"} | ` +
-      `is1080=${is1080(t)} | ` +
-      `is720=${is720(t)}`
+      `${torrent.name} | ` +
+      `size=${sizeOf(torrent)} | ` +
+      `resolution=${resolutionOf(torrent)} | ` +
+      `source=${torrent.resolutionSource || "filename"} | ` +
+      `is1080=${is1080(torrent)} | ` +
+      `is720=${is720(torrent)}`
     );
   }
 
-  /*
-   * ==================================================
-   * 1. PREFER 1080p <= 3.5 GB
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     1080p <= 3.5 GB
+  ---------------------------------------------------------- */
 
   const MAX_1080_SIZE =
     3.5 *
@@ -367,77 +433,87 @@ function selectBestTorrent(torrents) {
     1024 *
     1024;
 
+
   const suitable1080 =
-    pool.filter(t =>
-      is1080(t) &&
-      sizeOf(t) <=
-        MAX_1080_SIZE
+    pool.filter(
+      torrent =>
+        is1080(torrent) &&
+        sizeOf(torrent) <=
+          MAX_1080_SIZE
     );
+
 
   console.log(
     "\n🎯 1080p candidates:"
   );
 
+
   for (
-    const t of suitable1080
+    const torrent
+    of suitable1080
   ) {
 
     console.log(
-      `${t.name} | size=${sizeOf(t)}`
+      `${torrent.name} | size=${sizeOf(torrent)}`
     );
   }
+
 
   if (
     suitable1080.length > 0
   ) {
 
-    return [...suitable1080]
-      .sort((a, b) => {
+    return [
+      ...suitable1080
+    ].sort((a, b) => {
 
-        const sizeDiff =
-          sizeOf(a) -
-          sizeOf(b);
+      const sizeDiff =
+        sizeOf(a) -
+        sizeOf(b);
 
-        if (sizeDiff !== 0) {
-          return sizeDiff;
-        }
+      if (sizeDiff !== 0) {
+        return sizeDiff;
+      }
 
-        const hevcDiff =
-          Number(isHEVC(b)) -
-          Number(isHEVC(a));
 
-        if (hevcDiff !== 0) {
-          return hevcDiff;
-        }
+      const hevcDiff =
+        Number(isHEVC(b)) -
+        Number(isHEVC(a));
 
-        const aWeb =
-          /web[- ]dl/i.test(
-            a.name
-          );
+      if (hevcDiff !== 0) {
+        return hevcDiff;
+      }
 
-        const bWeb =
-          /web[- ]dl/i.test(
-            b.name
-          );
 
-        return (
-          Number(bWeb) -
-          Number(aWeb)
+      const aWeb =
+        /web[- ]dl/i.test(
+          a.name
         );
 
-      })[0];
+      const bWeb =
+        /web[- ]dl/i.test(
+          b.name
+        );
+
+
+      return (
+        Number(bWeb) -
+        Number(aWeb)
+      );
+
+    })[0];
   }
 
-  /*
-   * ==================================================
-   * 2. NO SUITABLE 1080p
-   *
-   * LOOK FOR 720p
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     720p
+  ---------------------------------------------------------- */
 
   const torrents720 =
-    pool.filter(is720);
+    pool.filter(
+      is720
+    );
+
 
   if (
     torrents720.length > 0
@@ -449,135 +525,146 @@ function selectBestTorrent(torrents) {
       1024 *
       1024;
 
+
     const suitable720 =
       torrents720.filter(
-        t =>
-          sizeOf(t) <=
+        torrent =>
+          sizeOf(torrent) <=
           MAX_720_SIZE
       );
+
 
     if (
       suitable720.length > 0
     ) {
 
-      return [...suitable720]
-        .sort((a, b) => {
+      return [
+        ...suitable720
+      ].sort((a, b) => {
 
-          const sizeDiff =
-            sizeOf(b) -
-            sizeOf(a);
+        const sizeDiff =
+          sizeOf(b) -
+          sizeOf(a);
 
-          if (sizeDiff !== 0) {
-            return sizeDiff;
-          }
+        if (sizeDiff !== 0) {
+          return sizeDiff;
+        }
 
-          const hevcDiff =
-            Number(isHEVC(b)) -
-            Number(isHEVC(a));
 
-          if (hevcDiff !== 0) {
-            return hevcDiff;
-          }
+        const hevcDiff =
+          Number(isHEVC(b)) -
+          Number(isHEVC(a));
 
-          const aWeb =
-            /web[- ]dl/i.test(
-              a.name
-            );
+        if (hevcDiff !== 0) {
+          return hevcDiff;
+        }
 
-          const bWeb =
-            /web[- ]dl/i.test(
-              b.name
-            );
 
-          return (
-            Number(bWeb) -
-            Number(aWeb)
+        const aWeb =
+          /web[- ]dl/i.test(
+            a.name
           );
 
-        })[0];
+        const bWeb =
+          /web[- ]dl/i.test(
+            b.name
+          );
+
+
+        return (
+          Number(bWeb) -
+          Number(aWeb)
+        );
+
+      })[0];
     }
+
 
     /*
      * 720p exists but all are >2GB.
      * Choose smallest 720p.
      */
 
-    return [...torrents720]
-      .sort((a, b) => {
+    return [
+      ...torrents720
+    ].sort((a, b) => {
 
-        const sizeDiff =
-          sizeOf(a) -
-          sizeOf(b);
+      const sizeDiff =
+        sizeOf(a) -
+        sizeOf(b);
 
-        if (sizeDiff !== 0) {
-          return sizeDiff;
-        }
+      if (sizeDiff !== 0) {
+        return sizeDiff;
+      }
 
-        const hevcDiff =
-          Number(isHEVC(b)) -
-          Number(isHEVC(a));
 
-        if (hevcDiff !== 0) {
-          return hevcDiff;
-        }
+      const hevcDiff =
+        Number(isHEVC(b)) -
+        Number(isHEVC(a));
 
-        return 0;
+      if (hevcDiff !== 0) {
+        return hevcDiff;
+      }
 
-      })[0];
+
+      return 0;
+
+    })[0];
   }
 
-  /*
-   * ==================================================
-   * 3. NO 720p
-   *
-   * USE 1080p EVEN IF >3.5GB
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     1080p EVEN IF >3.5 GB
+  ---------------------------------------------------------- */
 
   const all1080 =
-    pool.filter(is1080);
+    pool.filter(
+      is1080
+    );
+
 
   if (
     all1080.length > 0
   ) {
 
-    return [...all1080]
-      .sort((a, b) => {
+    return [
+      ...all1080
+    ].sort((a, b) => {
 
-        const sizeDiff =
-          sizeOf(a) -
-          sizeOf(b);
+      const sizeDiff =
+        sizeOf(a) -
+        sizeOf(b);
 
-        if (sizeDiff !== 0) {
-          return sizeDiff;
-        }
+      if (sizeDiff !== 0) {
+        return sizeDiff;
+      }
 
-        const hevcDiff =
-          Number(isHEVC(b)) -
-          Number(isHEVC(a));
 
-        if (hevcDiff !== 0) {
-          return hevcDiff;
-        }
+      const hevcDiff =
+        Number(isHEVC(b)) -
+        Number(isHEVC(a));
 
-        return 0;
+      if (hevcDiff !== 0) {
+        return hevcDiff;
+      }
 
-      })[0];
+
+      return 0;
+
+    })[0];
   }
 
-  /*
-   * ==================================================
-   * 4. NO 1080p OR 720p
-   *
-   * CHOOSE HIGHEST AVAILABLE RESOLUTION
-   * ==================================================
-   */
+
+  /* ----------------------------------------------------------
+     HIGHEST AVAILABLE RESOLUTION
+  ---------------------------------------------------------- */
 
   const resolutionTorrents =
     pool.filter(
-      t =>
-        resolutionOf(t) > 0
+      torrent =>
+        resolutionOf(torrent) > 0
     );
+
 
   if (
     resolutionTorrents.length > 0
@@ -590,12 +677,14 @@ function selectBestTorrent(torrents) {
         )
       );
 
+
     const highestResolutionTorrents =
       resolutionTorrents.filter(
-        t =>
-          resolutionOf(t) ===
+        torrent =>
+          resolutionOf(torrent) ===
           highestResolution
       );
+
 
     return [
       ...highestResolutionTorrents
@@ -609,6 +698,7 @@ function selectBestTorrent(torrents) {
         return sizeDiff;
       }
 
+
       const hevcDiff =
         Number(isHEVC(b)) -
         Number(isHEVC(a));
@@ -617,18 +707,20 @@ function selectBestTorrent(torrents) {
         return hevcDiff;
       }
 
+
       return 0;
 
     })[0];
   }
 
-  /*
-   * ==================================================
-   * 5. NO RECOGNIZABLE RESOLUTION
-   * ==================================================
-   */
 
-  return [...pool].sort(
+  /* ----------------------------------------------------------
+     FALLBACK
+  ---------------------------------------------------------- */
+
+  return [
+    ...pool
+  ].sort(
     (a, b) =>
       sizeOf(a) -
       sizeOf(b)
@@ -636,9 +728,9 @@ function selectBestTorrent(torrents) {
 }
 
 
-/* --------------------------------------------------
-   Cleanup Helpers
--------------------------------------------------- */
+/* ============================================================
+   EXTRACT MOVIE KEY
+============================================================ */
 
 function extractMovieKey(name) {
 
@@ -647,12 +739,14 @@ function extractMovieKey(name) {
       /-\s*(.+?\(\d{4}\))/
     );
 
+
   if (match) {
 
     return match[1]
       .trim()
       .toLowerCase();
   }
+
 
   return name
     .replace(
@@ -668,9 +762,9 @@ function extractMovieKey(name) {
 }
 
 
-/* --------------------------------------------------
-   Get Torrents By Tag
--------------------------------------------------- */
+/* ============================================================
+   GET TORRENTS BY TAG
+============================================================ */
 
 export async function getTorrentsByTag(tag) {
 
@@ -684,44 +778,51 @@ export async function getTorrentsByTag(tag) {
       }
     );
 
+
   await delay(
     3000,
     true
   );
 
+
   return data;
 }
 
 
-/* --------------------------------------------------
-   Delete Torrents
--------------------------------------------------- */
+/* ============================================================
+   DELETE TORRENTS + FILES
+============================================================ */
 
 export async function deleteTorrents(
   hashes
 ) {
 
-  if (!hashes.length) {
+  if (
+    !hashes ||
+    !hashes.length
+  ) {
     return;
   }
+
 
   await qb.post(
     "/api/v2/torrents/delete",
     new URLSearchParams({
+
       hashes:
         hashes.join("|"),
 
       deleteFiles:
         "true"
+
     })
   );
 }
 
 
 /* ============================================================
-   NEW:
-   GET CURRENT MOVIE GROUP AGAIN
-   ============================================================ */
+   GET CURRENT MOVIE GROUP
+============================================================ */
 
 async function getCurrentMovieGroup(
   tag,
@@ -729,119 +830,601 @@ async function getCurrentMovieGroup(
 ) {
 
   const currentTorrents =
-    await getTorrentsByTag(tag);
-
-  const currentGroup =
-    currentTorrents.filter(
-      torrent =>
-        extractMovieKey(
-          torrent.name
-        ) === movieKey
+    await getTorrentsByTag(
+      tag
     );
 
-  return currentGroup;
+
+  return currentTorrents.filter(
+    torrent =>
+      extractMovieKey(
+        torrent.name
+      ) === movieKey
+  );
 }
 
 
 /* ============================================================
-   NEW:
-   CHECK WHETHER METADATA IS READY
-   ============================================================ */
+   METADATA READY
+============================================================ */
 
-function hasCompletedMetadata(
-  torrents
-) {
+function isMetadataReady(torrent) {
 
-  if (
-    !Array.isArray(torrents) ||
-    torrents.length === 0
-  ) {
+  if (!torrent) {
     return false;
   }
 
-  return torrents.some(torrent => {
 
-    const size =
-      Number(torrent.size);
+  const size =
+    Number(torrent.size);
 
-    return (
-      Number.isFinite(size) &&
-      size > 0 &&
-      typeof torrent.name === "string" &&
-      torrent.name.trim() !== ""
-    );
-  });
+
+  return (
+    Number.isFinite(size) &&
+    size > 0 &&
+    typeof torrent.name === "string" &&
+    torrent.name.trim() !== ""
+  );
 }
 
 
 /* ============================================================
-   NEW:
-   WAIT FOR MOVIE METADATA
-   ============================================================
- *
- * Only called when selectBestTorrent() returns null.
- *
- * It re-fetches qBittorrent every 30 seconds.
- *
- * IMPORTANT:
- * It does NOT restart cleanupTodayTorrents().
- * It only waits for this movie.
- *
- * ============================================================
- */
+   DELETE ONE TORRENT IMMEDIATELY
+============================================================ */
 
-async function waitForMovieMetadata(
+async function deleteTorrentImmediately(
+  torrent
+) {
+
+  if (
+    !torrent ||
+    !torrent.hash
+  ) {
+    return;
+  }
+
+
+  /*
+   * PreDVD -> Radarr cleanup queue
+   */
+
+  if (
+    isPreDVD(
+      torrent.name
+    ) &&
+    String(
+      torrent.tags || ""
+    )
+      .split(",")
+      .map(
+        tag =>
+          tag.trim().toLowerCase()
+      )
+      .includes("predvd")
+  ) {
+
+    await queueRadarrCleanup(
+      torrent
+    );
+  }
+
+
+  console.log(
+    `🗑️ Deleting immediately: ${torrent.name}`
+  );
+
+
+  await publishMessage({
+    message:
+      `🗑️ Deleting immediately: ${torrent.name}`
+  });
+
+
+  await deleteTorrents([
+    torrent.hash
+  ]);
+}
+
+
+/* ============================================================
+   PROCESS ONE MOVIE FOR ONE ROUND
+
+   IMPORTANT:
+
+   NEVER WAIT HERE.
+
+   The movie gets ONE TURN.
+
+   Metadata-ready torrents are evaluated immediately.
+
+   Metadata-pending torrents remain untouched.
+
+   Then the function returns and the next movie is processed.
+============================================================ */
+
+async function processMovieOnce(
   tag,
   movieKey,
   initialGroup
 ) {
 
-  let currentGroup =
-    initialGroup;
+  if (
+    !initialGroup ||
+    initialGroup.length === 0
+  ) {
+
+    return {
+      processed: false,
+      pending: false
+    };
+  }
+
+
+  console.log("");
+  console.log(
+    "================================================="
+  );
+
+
+  console.log(
+    `🎬 Processing: ${movieKey}`
+  );
+
+
+  console.log(
+    `📦 Total torrents: ${initialGroup.length}`
+  );
+
 
   /*
-   * If metadata is already available,
-   * no retry is required.
+   * Analyze CURRENT metadata only.
+   */
+
+  const analyzedGroup =
+    analyzeResolutions(
+      initialGroup
+    );
+
+
+  /*
+   * Separate ready and pending.
+   */
+
+  const metadataReady =
+    analyzedGroup.filter(
+      isMetadataReady
+    );
+
+
+  const metadataPending =
+    analyzedGroup.filter(
+      torrent =>
+        !isMetadataReady(torrent)
+    );
+
+
+  console.log(
+    `📊 Metadata ready: ${metadataReady.length}`
+  );
+
+
+  console.log(
+    `⏳ Metadata pending: ${metadataPending.length}`
+  );
+
+
+  /*
+   * ----------------------------------------------------------
+   * NOTHING READY
+   * ----------------------------------------------------------
    */
 
   if (
-    hasCompletedMetadata(
-      currentGroup
-    )
-  ) {
-
-    return currentGroup;
-  }
-
-  console.log(
-    `⏳ Metadata not ready for ${movieKey}. ` +
-    `Waiting for qBittorrent metadata...`
-  );
-
-  await publishMessage({
-    message:
-      `⏳ Metadata not ready for ${movieKey}. ` +
-      `Waiting for qBittorrent metadata...`
-  });
-
-
-  for (
-    let attempt = 1;
-    attempt <= METADATA_MAX_RETRIES;
-    attempt++
+    metadataReady.length === 0
   ) {
 
     console.log(
-      `⏳ ${movieKey}: metadata retry ` +
-      `${attempt}/${METADATA_MAX_RETRIES} ` +
-      `(next check in 30 seconds)`
+      `⏳ ${movieKey}: no metadata-ready torrent yet.`
     );
+
 
     await publishMessage({
       message:
-        `⏳ ${movieKey}: metadata retry ` +
-        `${attempt}/${METADATA_MAX_RETRIES}`
+        `⏳ ${movieKey}: no metadata-ready torrent yet.`
     });
+
+
+    return {
+      processed: false,
+      pending: true
+    };
+  }
+
+
+  /*
+   * ----------------------------------------------------------
+   * SELECT BEST FROM CURRENTLY READY TORRENTS
+   * ----------------------------------------------------------
+   */
+
+  const best =
+    selectBestTorrent(
+      metadataReady
+    );
+
+
+  if (!best) {
+
+    return {
+      processed: false,
+      pending: metadataPending.length > 0
+    };
+  }
+
+
+  console.log("");
+  console.log(
+    `🏆 Current best: ${best.name}`
+  );
+
+
+  await publishMessage({
+    message:
+      `🏆 Current best: ${best.name}`
+  });
+
+
+  /*
+   * ----------------------------------------------------------
+   * DELETE ONLY OTHER METADATA-READY TORRENTS
+   *
+   * NEVER DELETE size=0 torrents.
+   * ----------------------------------------------------------
+   */
+
+  const losers =
+    metadataReady.filter(
+      torrent =>
+        torrent.hash !== best.hash
+    );
+
+
+  console.log(
+    `🧹 ${losers.length} inferior metadata-ready torrent(s) will be deleted.`
+  );
+
+
+  for (
+    const loser
+    of losers
+  ) {
+
+    await deleteTorrentImmediately(
+      loser
+    );
+  }
+
+
+  /*
+   * ----------------------------------------------------------
+   * PENDING TORRENTS ARE LEFT ALONE
+   * ----------------------------------------------------------
+   */
+
+  if (
+    metadataPending.length > 0
+  ) {
+
+    console.log(
+      `⏳ ${movieKey}: keeping ${metadataPending.length} metadata-pending torrent(s).`
+    );
+
+
+    await publishMessage({
+      message:
+        `⏳ ${movieKey}: keeping ${metadataPending.length} metadata-pending torrent(s).`
+    });
+
+
+    return {
+      processed: true,
+      pending: true
+    };
+  }
+
+
+  console.log(
+    `✅ ${movieKey}: no metadata pending.`
+  );
+
+
+  return {
+    processed: true,
+    pending: false
+  };
+}
+
+
+/* ============================================================
+   CLEANUP TODAY TORRENTS
+
+   NEW BEHAVIOR:
+
+   1. Read all qBittorrent torrents.
+   2. Group by movie.
+   3. Sort movies by torrent count DESCENDING.
+   4. Process EACH movie exactly once.
+   5. NEVER wait for a movie.
+   6. Metadata-ready losers are deleted immediately.
+   7. Metadata-pending torrents stay untouched.
+   8. Return false if another round is needed.
+============================================================ */
+
+export async function cleanupTodayTorrents() {
+
+  const tag =
+    "script";
+
+
+  console.log("");
+  console.log(
+    "================================================="
+  );
+  console.log(
+    "🧹 TORRENT CLEANUP ROUND"
+  );
+  console.log(
+    "================================================="
+  );
+
+
+  await publishMessage({
+    message:
+      `🧹 Starting torrent cleanup round`
+  });
+
+
+  /*
+   * ==========================================================
+   * GET CURRENT TORRENTS
+   * ==========================================================
+   */
+
+  const torrents =
+    await getTorrentsByTag(
+      tag
+    );
+
+
+  if (
+    !torrents ||
+    torrents.length === 0
+  ) {
+
+    console.log(
+      "✅ No torrents found."
+    );
+
+
+    await publishMessage({
+      message:
+        "✅ No torrents found."
+    });
+
+
+    return true;
+  }
+
+
+  /*
+   * ==========================================================
+   * GROUP BY MOVIE
+   * ==========================================================
+   */
+
+  const grouped = {};
+
+
+  for (
+    const torrent
+    of torrents
+  ) {
+
+    const movieKey =
+      extractMovieKey(
+        torrent.name
+      );
+
+
+    if (
+      !grouped[movieKey]
+    ) {
+
+      grouped[movieKey] = [];
+    }
+
+
+    grouped[movieKey].push(
+      torrent
+    );
+  }
+
+
+  /*
+   * ==========================================================
+   * SORT MOVIES BY NUMBER OF TORRENTS
+   *
+   * MOST CANDIDATES FIRST.
+   *
+   * This prevents one movie from blocking the others.
+   * ==========================================================
+   */
+
+  // ============================================================
+// ONLY PROCESS MOVIES WITH MORE THAN ONE TORRENT
+// ============================================================
+
+const movies =
+  Object.entries(grouped)
+    .filter(
+      ([, group]) =>
+        group.length > 1
+    )
+    .sort(
+      ([, groupA], [, groupB]) =>
+        groupB.length -
+        groupA.length
+    );
+
+
+console.log("");
+console.log(
+  `📊 Total movie groups: ${Object.keys(grouped).length}`
+);
+
+console.log(
+  `🎯 Movies requiring candidate selection: ${movies.length}`
+);
+
+console.log(
+  `⏭️ Movies skipped because they have only 1 torrent: ${
+    Object.keys(grouped).length - movies.length
+  }`
+);
+
+
+console.log("");
+console.log(
+  "📊 MOVIES TO PROCESS:"
+);
+
+
+movies.forEach(
+  ([movieKey, group], index) => {
+
+    console.log(
+      `${index + 1}. ${movieKey} → ${group.length} torrent(s)`
+    );
+  }
+);
+
+
+
+  await publishMessage({
+    message:
+      `📊 Processing ${movies.length} movie group(s)`
+  });
+
+
+  /*
+   * ==========================================================
+   * PROCESS EVERY MOVIE ONCE
+   *
+   * NO WAITING.
+   * ==========================================================
+   */
+
+  let metadataPendingAnywhere =
+    false;
+
+
+for (
+  const [movieKey]
+  of movies
+) {
+
+  const currentGroup =
+    await getCurrentMovieGroup(
+      tag,
+      movieKey
+    );
+
+
+  if (
+    !currentGroup ||
+    currentGroup.length <= 1
+  ) {
+
+    console.log(
+      `⏭️ Skipping ${movieKey}: only 1 torrent remains.`
+    );
+
+    continue;
+  }
+
+
+  const result =
+    await processMovieOnce(
+      tag,
+      movieKey,
+      currentGroup
+    );
+
+
+  if (
+    result.pending
+  ) {
+
+    metadataPendingAnywhere = true;
+  }
+
+  // NO WAIT HERE.
+  // Immediately process the next movie.
+}
+
+
+  /*
+   * ==========================================================
+   * ROUND FINISHED
+   * ==========================================================
+   */
+
+  console.log("");
+  console.log(
+    "================================================="
+  );
+  console.log(
+    "🏁 CLEANUP ROUND FINISHED"
+  );
+  console.log(
+    "================================================="
+  );
+
+
+  /*
+   * ==========================================================
+   * MORE METADATA NEEDED
+   * ==========================================================
+   */
+
+  if (
+    metadataPendingAnywhere
+  ) {
+
+    console.log(
+      `⏳ Some movies still have metadata pending.`
+    );
+
+
+    console.log(
+      `🔄 Next round will start after ${METADATA_RETRY_INTERVAL / 1000} seconds.`
+    );
+
+
+    await publishMessage({
+      message:
+        `⏳ Some movies still have metadata pending.`
+    });
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Wait ONLY after ALL movies have received
+     * one turn.
+     *
+     * This is the key difference from the old logic.
+     */
 
     await delay(
       METADATA_RETRY_INTERVAL,
@@ -850,457 +1433,30 @@ async function waitForMovieMetadata(
 
 
     /*
-     * Re-fetch the current qBittorrent list.
+     * Return false so the caller can run another
+     * cleanup round.
      */
 
-    try {
-
-      currentGroup =
-        await getCurrentMovieGroup(
-          tag,
-          movieKey
-        );
-
-    } catch (error) {
-
-      console.error(
-        `❌ Failed to refresh metadata for ${movieKey}:`,
-        error
-      );
-
-      continue;
-    }
-
-
-    /*
-     * Movie may have disappeared.
-     */
-
-    if (
-      !currentGroup.length
-    ) {
-
-      console.log(
-        `⚠️ ${movieKey} is no longer present in qBittorrent.`
-      );
-
-      return [];
-    }
-
-
-    /*
-     * Check whether at least one torrent
-     * now has completed qBittorrent metadata.
-     */
-
-    if (
-      hasCompletedMetadata(
-        currentGroup
-      )
-    ) {
-
-      console.log(
-        `✅ Metadata completed for ${movieKey} ` +
-        `after ${attempt} retry attempt(s).`
-      );
-
-      await publishMessage({
-        message:
-          `✅ Metadata completed for ${movieKey} ` +
-          `after ${attempt} retry attempt(s).`
-      });
-
-      return currentGroup;
-    }
+    return false;
   }
 
 
   /*
-   * Metadata never became available.
+   * ==========================================================
+   * EVERYTHING FINISHED
+   * ==========================================================
    */
 
   console.log(
-    `⏰ Metadata still incomplete for ${movieKey} ` +
-    `after ${METADATA_MAX_RETRIES} retries.`
+    "✅ All currently available torrent cleanup completed."
   );
+
 
   await publishMessage({
     message:
-      `⏰ Metadata still incomplete for ${movieKey} ` +
-      `after ${METADATA_MAX_RETRIES} retries.`
+      "✅ All currently available torrent cleanup completed."
   });
 
-  return null;
-}
 
-
-/* --------------------------------------------------
-   Cleanup Torrents
--------------------------------------------------- */
-
-export async function cleanupTodayTorrents() {
-
-  let metadataRetryNeeded = false;
-  const tag =
-    "script";
-
-  await publishMessage({
-    message:
-      `Searching QB torrents with tag: ${tag}`
-  });
-
-  console.log(
-    `Searching QB torrents with tag: ${tag}`
-  );
-
-
-  /*
-   * Initial torrent list.
-   */
-
-  let torrents =
-    await getTorrentsByTag(tag);
-
-  await delay(
-    2000,
-    true
-  );
-
-
-  if (
-    !torrents.length
-  ) {
-
-    console.log(
-      "No torrents found for today cleanup"
-    );
-
-    await publishMessage({
-      message:
-        "No torrents found for today cleanup"
-    });
-
-    return;
-  }
-
-
-  /*
-   * ==================================================
-   * GROUP TORRENTS BY MOVIE
-   * ==================================================
-   */
-
-  const grouped = {};
-
-  for (
-    const torrent
-    of torrents
-  ) {
-
-    const key =
-      extractMovieKey(
-        torrent.name
-      );
-
-    if (
-      !grouped[key]
-    ) {
-
-      grouped[key] = [];
-    }
-
-    grouped[key].push(
-      torrent
-    );
-  }
-
-
-  const hashesToDelete = [];
-
-
-  /*
-   * ==================================================
-   * PROCESS EACH MOVIE
-   * ==================================================
-   */
-
-  for (
-    const movie
-    in grouped
-  ) {
-
-    let group =
-      grouped[movie];
-
-
-    /*
-     * Only one torrent:
-     * nothing to clean.
-     */
-
-    if (
-      group.length === 1
-    ) {
-      continue;
-    }
-
-
-    /*
-     * ==================================================
-     * FIRST RESOLUTION ANALYSIS
-     *
-     * IMPORTANT:
-     * Analyze the COMPLETE group.
-     * ==================================================
-     */
-
-    let analyzedGroup =
-      analyzeResolutions(
-        group
-      );
-
-
-    let best =
-      selectBestTorrent(
-        analyzedGroup
-      );
-
-
-    /*
-     * ==================================================
-     * IF NO TORRENT HAS COMPLETED METADATA:
-     *
-     * WAIT AND RE-FETCH THIS MOVIE.
-     * ==================================================
-     */
-
-    if (!best) {
-
-      const refreshedGroup =
-        await waitForMovieMetadata(
-          tag,
-          movie,
-          group
-        );
-
-
-      /*
-       * Metadata still unavailable.
-       */
-
-      if (
-        !refreshedGroup ||
-        !refreshedGroup.length
-      ) {
-        metadataRetryNeeded = true;
-
-        console.log(
-          `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
-        );
-
-        await publishMessage({
-          message:
-            `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
-        });
-        
-        continue;
-      }
-
-
-      /*
-       * Use the freshly fetched qBittorrent
-       * objects from this point onward.
-       */
-
-      group =
-        refreshedGroup;
-
-
-      /*
-       * Re-run resolution analysis using
-       * the NEW metadata.
-       */
-
-      analyzedGroup =
-        analyzeResolutions(
-          group
-        );
-
-
-      /*
-       * Run the complete existing selection
-       * logic again.
-       */
-
-      best =
-        selectBestTorrent(
-          analyzedGroup
-        );
-
-
-      /*
-       * Extremely unlikely, but protect against
-       * metadata disappearing between requests.
-       */
-
-      if (!best) {
-        metadataRetryNeeded = true;
-
-        console.log(
-          `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
-        );
-
-        await publishMessage({
-          message:
-            `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
-        });
-
-        continue;
-      }
-    }
-
-
-    /*
-     * ==================================================
-     * DISPLAY CANDIDATES
-     * ==================================================
-     */
-
-    const separator =
-      "========================================";
-
-    console.log(
-      separator
-    );
-
-    await publishMessage({
-      message:
-        separator
-    });
-
-
-    console.log(
-      `Checking duplicates for: ${movie}`
-    );
-
-    await publishMessage({
-      message:
-        `Checking duplicates for: ${movie}`
-    });
-
-
-    for (
-      const torrent
-      of group
-    ) {
-
-      console.log(
-        `Candidate: ${torrent.name}`
-      );
-
-      await publishMessage({
-        message:
-          `Candidate: ${torrent.name}`
-      });
-    }
-
-
-    /*
-     * ==================================================
-     * KEEP BEST
-     * ==================================================
-     */
-
-    console.log(
-      `Keeping: ${best.name}`
-    );
-
-    await publishMessage({
-      message:
-        `Keeping: ${best.name}`
-    });
-
-
-    /*
-     * ==================================================
-     * DELETE ALL OTHER TORRENTS
-     * ==================================================
-     */
-
-    const torrentsToDelete =
-      group.filter(
-        t =>
-          t.hash !==
-          best.hash
-      );
-
-
-    for (
-      const torrent
-      of torrentsToDelete
-    ) {
-
-      /*
-       * If this is a PreDVD torrent carrying
-       * the predvd tag, add the movie to the
-       * Radarr cleanup queue.
-       */
-
-      if (
-        isPreDVD(
-          torrent.name
-        ) &&
-        String(
-          torrent.tags || ""
-        )
-          .split(",")
-          .map(
-            tag =>
-              tag
-                .trim()
-                .toLowerCase()
-          )
-          .includes(
-            "predvd"
-          )
-      ) {
-
-        await queueRadarrCleanup(
-          torrent
-        );
-      }
-
-
-      hashesToDelete.push(
-        torrent.hash
-      );
-    }
-  }
-
-
-  /*
-   * ==================================================
-   * DELETE DUPLICATES
-   * ==================================================
-   */
-
-  if (
-    hashesToDelete.length
-  ) {
-
-    await deleteTorrents(
-      hashesToDelete
-    );
-
-    console.log(
-      "Duplicate torrents deleted"
-    );
-
-  } else {
-
-    console.log(
-      "No duplicates found"
-    );
-  }
-  return !metadataRetryNeeded;
+  return true;
 }

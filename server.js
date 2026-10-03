@@ -10,6 +10,8 @@ import { publishMessage } from "./queue/publishMessage.js";
 import { retry } from "./homeassitant/RetryWrapper.js";
 import { selectPredvd } from "./qbittorrent/predvd.js";
 import { moveTodayShowsToTV } from "./qbittorrent/moveTodayShowsToTV.js";
+import { sortDownloadingTorrentsAlphabetically } from "./sortqbit.js";
+
 
 async function main() {
   try {
@@ -24,7 +26,10 @@ async function main() {
     await delay(2000, true);
     await selectPredvd();
 
-    await delay(5000, true);
+    await delay(2000, true);
+    // await sortDownloadingTorrentsAlphabetically();
+    // await delay(2000, true);
+
 
 let result = false;
 
