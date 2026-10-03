@@ -26,7 +26,27 @@ async function main() {
 
     await delay(5000, true);
 
-    await cleanupTodayTorrents();
+let result = false;
+
+while (!result) {
+
+  console.log("🚀 Starting torrent cleanup...");
+
+  result = await cleanupTodayTorrents();
+
+  if (!result) {
+    console.log(
+      "⏳ Some torrents still have incomplete metadata. Retrying in 30 seconds..."
+    );
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 30 * 1000)
+    );
+  }
+}
+
+console.log("✅ Torrent cleanup completed. All metadata is ready.");
+
     await delay(2000, true);
 
     await moveTodayShowsToTV();

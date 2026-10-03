@@ -940,6 +940,7 @@ async function waitForMovieMetadata(
 
 export async function cleanupTodayTorrents() {
 
+  let metadataRetryNeeded = false;
   const tag =
     "script";
 
@@ -1091,6 +1092,7 @@ export async function cleanupTodayTorrents() {
         !refreshedGroup ||
         !refreshedGroup.length
       ) {
+        metadataRetryNeeded = true;
 
         console.log(
           `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
@@ -1100,7 +1102,7 @@ export async function cleanupTodayTorrents() {
           message:
             `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
         });
-
+        
         continue;
       }
 
@@ -1142,6 +1144,7 @@ export async function cleanupTodayTorrents() {
        */
 
       if (!best) {
+        metadataRetryNeeded = true;
 
         console.log(
           `Skipping ${movie}: 🤬 no torrent has completed metadata yet.`
@@ -1299,4 +1302,5 @@ export async function cleanupTodayTorrents() {
       "No duplicates found"
     );
   }
+  return !metadataRetryNeeded;
 }
