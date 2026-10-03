@@ -1,7 +1,7 @@
 import { qb } from "./qb.js";
 import { publishMessage } from "../queue/publishMessage.js";
 import { delay } from "../delay.js";
-
+import { queueRadarrCleanup } from "../radarrCleanupQueue.js";
 const TWO_GB = 2 * 1024 * 1024 * 1024;
 const THREE_GB = 3 * 1024 * 1024 * 1024;
 const FIVE_GB = 5 * 1024 * 1024 * 1024;
@@ -778,13 +778,28 @@ export async function cleanupTodayTorrents() {
         `Keeping: ${best.name}`
     });
 
-    group
-      .filter(t =>
-        t.hash !== best.hash
-      )
-      .forEach(t =>
-        hashesToDelete.push(t.hash)
-      );
+const torrentsToDelete = group.filter(
+  t => t.hash !== best.hash
+);
+
+for (const torrent of torrentsToDelete) {
+
+  /*
+   * If this is a PreDVD torrent carrying the
+   * predvdtag, add the movie to Radarr cleanup queue.
+   */
+  if (
+    isPreDVD(torrent.name) &&
+    String(torrent.tags || "")
+      .split(",")
+      .map(tag => tag.trim().toLowerCase())
+      .includes("predvd")
+  ) {
+    await queueRadarrCleanup(torrent);
+  }
+
+  hashesToDelete.push(torrent.hash);
+}
   }
 
   if (hashesToDelete.length) {
