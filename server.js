@@ -27,8 +27,8 @@ async function main() {
     await selectPredvd();
 
     await delay(2000, true);
-    // await sortDownloadingTorrentsAlphabetically();
-    // await delay(2000, true);
+    await sortDownloadingTorrentsAlphabetically();
+    await delay(2000, true);
 
 
 let result = false;
