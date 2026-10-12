@@ -1,5 +1,5 @@
 import { delay } from "./delay.js";
-import { cleanupTodayTorrents, moveTodayShowsToTV } from "./qbittorrent/torrentCleanUp.js";
+import { cleanupTodayTorrents } from "./qbittorrent/torrentCleanUp.js";
 import { loginQB } from "./qbittorrent/qb.js";
 import {
   triggerHomeAssistantWebhook,
@@ -9,6 +9,9 @@ import { log } from "./timelog.js";
 import { publishMessage } from "./queue/publishMessage.js";
 import { retry } from "./homeassitant/RetryWrapper.js";
 import { selectPredvd } from "./qbittorrent/predvd.js";
+import { moveTodayShowsToTV } from "./qbittorrent/moveTodayShowsToTV.js";
+import { sortDownloadingTorrentsAlphabetically } from "./sortqbit.js";
+
 
 async function main() {
   try {
@@ -23,9 +26,32 @@ async function main() {
     await delay(2000, true);
     await selectPredvd();
 
-    await delay(5000, true);
+    await delay(2000, true);
+    await sortDownloadingTorrentsAlphabetically();
+    await delay(2000, true);
 
-    await cleanupTodayTorrents();
+
+let result = false;
+
+while (!result) {
+
+  console.log("🚀 Starting torrent cleanup...");
+
+  result = await cleanupTodayTorrents();
+
+  if (!result) {
+    console.log(
+      "⏳ Some torrents still have incomplete metadata. Retrying in 30 seconds..."
+    );
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 30 * 1000)
+    );
+  }
+}
+
+console.log("✅ Torrent cleanup completed. All metadata is ready.");
+
     await delay(2000, true);
 
     await moveTodayShowsToTV();
