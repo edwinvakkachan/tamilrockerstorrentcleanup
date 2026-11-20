@@ -914,11 +914,6 @@ async function deleteTorrentImmediately(
   );
 
 
-  await publishMessage({
-    message:
-      `🗑️ Deleting immediately: ${torrent.name}`
-  });
-
 
   await deleteTorrents([
     torrent.hash
@@ -1028,10 +1023,6 @@ async function processMovieOnce(
     );
 
 
-    await publishMessage({
-      message:
-        `⏳ ${movieKey}: no metadata-ready torrent yet.`
-    });
 
 
     return {
@@ -1068,10 +1059,6 @@ async function processMovieOnce(
   );
 
 
-  await publishMessage({
-    message:
-      `🏆 Current best: ${best.name}`
-  });
 
 
   /*
@@ -1119,11 +1106,6 @@ async function processMovieOnce(
       `⏳ ${movieKey}: keeping ${metadataPending.length} metadata-pending torrent(s).`
     );
 
-
-    await publishMessage({
-      message:
-        `⏳ ${movieKey}: keeping ${metadataPending.length} metadata-pending torrent(s).`
-    });
 
 
     return {
@@ -1178,10 +1160,7 @@ export async function cleanupTodayTorrents() {
   );
 
 
-  await publishMessage({
-    message:
-      `🧹 Starting torrent cleanup round`
-  });
+
 
 
   /*
@@ -1206,10 +1185,6 @@ export async function cleanupTodayTorrents() {
     );
 
 
-    await publishMessage({
-      message:
-        "✅ No torrents found."
-    });
 
 
     return true;
@@ -1310,10 +1285,7 @@ movies.forEach(
 
 
 
-  await publishMessage({
-    message:
-      `📊 Processing ${movies.length} movie group(s)`
-  });
+
 
 
   /*
@@ -1410,11 +1382,6 @@ for (
       `🔄 Next round will start after ${METADATA_RETRY_INTERVAL / 1000} seconds.`
     );
 
-
-    await publishMessage({
-      message:
-        `⏳ Some movies still have metadata pending.`
-    });
 
 
     /*
